@@ -119,7 +119,7 @@ class Agent:
                 # current_ep_reward += reward
                 # update PPO agent
                 if time_step % update_timestep == 0:
-                    print("update")
+                    # print("update")
                     ppo_agent.update()
                 # if continuous action space; then decay action std of ouput action distribution
                 if (

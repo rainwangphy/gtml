@@ -172,8 +172,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--solution", type=str, default="the solution for the meta game"
     )
-    parser.add_argument("--train_max_episode", type=int, default=50)
-    parser.add_argument("--eval_max_episode", type=int, default=10)
+    parser.add_argument("--train_max_episode", type=int, default=100)
+    parser.add_argument("--eval_max_episode", type=int, default=100)
 
     parser.add_argument("--max_ep_len", type=int, default=1000)
     args = parser.parse_args()
