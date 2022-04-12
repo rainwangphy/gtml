@@ -4,7 +4,7 @@ import json
 import re
 import os
 from hashlib import md5
-from utils import Reservoir
+from cv.utils import Reservoir
 
 rating_regex = re.compile(r"\"overall\": (\d\.0)")
 

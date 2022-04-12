@@ -19,8 +19,8 @@ import torch
 # from models.wrn import Wide_ResNet
 from torchvision import datasets, transforms
 from meta_solvers.prd_solver import projected_replicator_dynamics
-from classifiers import do_classifier
-from attacks.pgd_attack import pgd_attacker
+from cv.classifiers import do_classifier
+from cv.attacks.pgd_attack import pgd_attacker
 
 
 class do_at:

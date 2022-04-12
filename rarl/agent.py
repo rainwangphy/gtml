@@ -123,8 +123,8 @@ class Agent:
                     ppo_agent.update()
                 # if continuous action space; then decay action std of ouput action distribution
                 if (
-                        has_continuous_action_space
-                        and time_step % action_std_decay_freq == 0
+                    has_continuous_action_space
+                    and time_step % action_std_decay_freq == 0
                 ):
                     ppo_agent.decay_action_std(action_std_decay_rate, min_action_std)
                 # break; if the episode is over

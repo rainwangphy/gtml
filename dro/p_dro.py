@@ -21,6 +21,8 @@ class p_dro_model:
         self.current_step = 0
 
     def train(self, data, adversary):
+        self.model.train()
+        adversary.eval()
         self.current_step += 1
         if (self.current_step - 1) % self.args.model_args.update_every == 0:
             self.m_opt.zero_grad()
@@ -45,8 +47,10 @@ class p_dro_model:
             self.lr_scheduler.step()
 
     def eval(self, data, adversary):
+        self.model.eval()
+        adversary.eval()
         model_loss = self.forward(data, adversary)
-        return model_loss
+        return model_loss.detach().cpu().numpy()
 
     def forward(self, data, adversary):
         task = self.task
@@ -131,6 +135,8 @@ class p_dro_adversary:
 
     def train(self, data, model):
         print()
+        model.eval()
+        self.adversary.eval()
         self.current_step += 1
         adv_args = self.args.adv_args
         self.adv_opt.zero_grad()
@@ -147,10 +153,11 @@ class p_dro_adversary:
             self.adv_opt.step()
 
     def eval(self, data, model):
-        print()
+        adv_loss = self.forward(data, model)
+        return adv_loss.detach().cpu().numpy()
 
     def forward(self, data, model):
-        print()
+        # print()
 
         task = model.task
         model = model.model

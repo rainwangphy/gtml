@@ -18,14 +18,14 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import numpy as np
 import torch.nn as nn
 
-from utils import clamp
-from utils import normalize_by_pnorm
-from utils import clamp_by_pnorm
-from utils import is_float_or_torch_tensor
-from utils import batch_multiply
-from utils import batch_clamp
-from utils import replicate_input
-from utils import batch_l1_proj
+from cv.utils import clamp
+from cv.utils import normalize_by_pnorm
+from cv.utils import clamp_by_pnorm
+from cv.utils import is_float_or_torch_tensor
+from cv.utils import batch_multiply
+from cv.utils import batch_clamp
+from cv.utils import replicate_input
+from cv.utils import batch_l1_proj
 
 # from advertorch.attacks.base import Attack
 # from advertorch.attacks.base import LabelMixin

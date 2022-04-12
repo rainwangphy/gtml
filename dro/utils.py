@@ -39,13 +39,13 @@ def find_tau_star(ell, kappa, log_min=-10, log_max=10):
 
 
 def compute_model_loss(
-        losses: torch.Tensor,
-        log_q: torch.Tensor,
-        log_p: torch.Tensor,
-        adv_args,
-        log_Z_adv: LogRunningAverage,
-        log_Z_model: LogRunningAverage,
-        errors,
+    losses: torch.Tensor,
+    log_q: torch.Tensor,
+    log_p: torch.Tensor,
+    adv_args,
+    log_Z_adv: LogRunningAverage,
+    log_Z_model: LogRunningAverage,
+    errors,
 ) -> torch.Tensor:
     """Computes the loss of the model given the model's los and the
     adversary's weights on each sample
@@ -108,13 +108,13 @@ def compute_model_loss(
 
 
 def compute_adv_loss(
-        losses: torch.Tensor,
-        log_q: torch.Tensor,
-        log_p: torch.Tensor,
-        adv_args,
-        log_Z_adv: LogRunningAverage,
-        log_Z_model: LogRunningAverage,
-        errors,
+    losses: torch.Tensor,
+    log_q: torch.Tensor,
+    log_p: torch.Tensor,
+    adv_args,
+    log_Z_adv: LogRunningAverage,
+    log_Z_model: LogRunningAverage,
+    errors,
 ) -> torch.Tensor:
     """Compute the adversary's loss given the model's loss on a batch of
     examples and the weights produced by the adversary

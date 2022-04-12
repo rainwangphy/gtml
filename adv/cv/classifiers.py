@@ -1,4 +1,4 @@
-from models.wrn import Wide_ResNet
+from cv.models.wrn import Wide_ResNet
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
