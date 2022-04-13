@@ -2,7 +2,32 @@ import torch
 from src.running_average import get_log_running_average, LogRunningAverage
 import numpy as np
 import scipy
+from src.models import build_model, ModelWithHead
+from src.tasks import task_list, prepare_task
+import traceback
+# import numpy as np
+import torch as th
+import torch.nn.functional as F
+import os.path
+import tqdm
+import hashlib
+import scipy.optimize
+from typing import Optional, Tuple
+from src.data.language_modeling import to_lm_batch
+from src.optim import get_optimizer, get_lr_scheduler
+from src.utils import cacheable, get_loader, get_group_dro_loader
+from src.tasks import LanguageModelingTask, CCLanguageModelingTask
+from src.configuration import Experiment, ArgumentGroup
+from src.running_average import get_log_running_average, LogRunningAverage
+from src.stopping import (
+    AverageStopping,
+    GreedyMinMaxStopping,
+    GroupRobustStopping,
+)
+from src.logging import NpzLogger
 
+import pdro_args
+from pdro_compare_models import filter_valid_advs
 
 def find_tau_star(ell, kappa, log_min=-10, log_max=10):
     # Find \tau^* such that KL(q^*_\tau^* || p) = \kappa
@@ -39,13 +64,13 @@ def find_tau_star(ell, kappa, log_min=-10, log_max=10):
 
 
 def compute_model_loss(
-    losses: torch.Tensor,
-    log_q: torch.Tensor,
-    log_p: torch.Tensor,
-    adv_args,
-    log_Z_adv: LogRunningAverage,
-    log_Z_model: LogRunningAverage,
-    errors,
+        losses: torch.Tensor,
+        log_q: torch.Tensor,
+        log_p: torch.Tensor,
+        adv_args,
+        log_Z_adv: LogRunningAverage,
+        log_Z_model: LogRunningAverage,
+        errors,
 ) -> torch.Tensor:
     """Computes the loss of the model given the model's los and the
     adversary's weights on each sample
@@ -108,13 +133,13 @@ def compute_model_loss(
 
 
 def compute_adv_loss(
-    losses: torch.Tensor,
-    log_q: torch.Tensor,
-    log_p: torch.Tensor,
-    adv_args,
-    log_Z_adv: LogRunningAverage,
-    log_Z_model: LogRunningAverage,
-    errors,
+        losses: torch.Tensor,
+        log_q: torch.Tensor,
+        log_p: torch.Tensor,
+        adv_args,
+        log_Z_adv: LogRunningAverage,
+        log_Z_model: LogRunningAverage,
+        errors,
 ) -> torch.Tensor:
     """Compute the adversary's loss given the model's loss on a batch of
     examples and the weights produced by the adversary
@@ -189,3 +214,91 @@ def compute_adv_loss(
     if adv_args.beta < 1:
         adv_loss = adv_args.beta * adv_loss + (1 - adv_args.beta) * (-log_q).mean()
     return adv_loss
+
+
+@cacheable(format="pt")
+def compute_dataset_log_probs(
+        lm,
+        task,
+        dataset="train",
+        batch_size=64,
+        max_tokens_per_batch=None,
+        joint=False,
+        class_conditional=False,
+        ratio_model=False,
+        num_workers=1,
+):
+    """Compute log probability of every sample in a dataset
+
+    Args:
+        lm (nn.Module): language model
+        task (Task): language modeling task (for computing the loss function)
+        dataset (str, optional): Dataset. Defaults to "train"
+            (training data of the task).
+        batch_size (int, optional): Batch size. Defaults to 64.
+        max_tokens_per_batch (int, optional): Number of tokens per batch
+            (for text data). Defaults to None.
+
+    Returns:
+        torch.Tensor: Tensor containing all scores
+        :param ratio_model:
+        :param joint:
+        :param task:
+        :param lm:
+        :param dataset:
+        :param max_tokens_per_batch:
+        :param num_workers:
+        :param batch_size:
+        :param class_conditional:
+    """
+    # LM task
+    if ratio_model:
+        # If using a ratio model we don't need to modify the task
+        adv_task = task
+    elif joint or class_conditional:
+        # if using a joint/generative (q(x, y)) or class-conditional (q(x|y))
+        # adversary, transform to class-conditional LM task
+        adv_task = CCLanguageModelingTask.from_text_task(
+            task, generative=not class_conditional
+        )
+    else:
+        # Otherwise transform to LM task
+        adv_task = LanguageModelingTask.from_text_task(task)
+    # Snapshot mode and set to eval mode
+    mode = lm.training
+    lm.train(mode=False)
+    # Determine dataset
+    if dataset == "train":
+        dataset = adv_task.train_data
+    elif dataset == "valid":
+        dataset = adv_task.valid_data
+    elif dataset == "test":
+        dataset = adv_task.test_data
+    elif not isinstance(dataset, th.utils.data.Dataset):
+        raise ValueError(
+            "dataset should be either a pytorch Dataset or one of"
+            "'train', 'valid', 'test'"
+        )
+    # Dataloader
+    sampler, loader = get_loader(
+        dataset,
+        batch_size,
+        max_tokens_per_batch=max_tokens_per_batch,
+        shuffle=False,
+        collate_fn=adv_task.collate_fn,
+        num_workers=num_workers,
+    )
+    # Computing all nlls
+    all_nlls = []
+    for batch in tqdm.tqdm(loader, desc="Computing LM scores"):
+        with th.no_grad():
+            if ratio_model:
+                logits = adv_task.logits(lm, batch)
+                y = batch.outputs.to(logits.device)
+                nlls = F.nll_loss(logits, y, reduction="none")
+            else:
+                nlls = adv_task.nll(lm, batch, reduction="none").sum(-1)
+            all_nlls.append(nlls.clone().detach().cpu())
+    all_nlls = th.cat(all_nlls)
+    lm.train(mode=mode)
+    return -all_nlls.clone().detach()

@@ -10,9 +10,10 @@ import dro.utils as utils
 
 
 class p_dro_model:
-    def __int__(self, args):
-        self.args = args
-        self.task = args.task
+    def __init__(self, config):
+        self.config = config
+        # print(config)
+        self.task = config.model_config.task
 
         self.model = self.get_model()
         self.m_opt = self.get_opt()
@@ -21,34 +22,41 @@ class p_dro_model:
         self.current_step = 0
 
     def train(self, data, adversary):
+        self.model.to(self.config.device)
+        adversary.adversary.to(self.config.device)
+        data = data.to(self.config.device)
         self.model.train()
-        adversary.eval()
+        adversary.adversary.eval()
         self.current_step += 1
-        if (self.current_step - 1) % self.args.model_args.update_every == 0:
+        if (self.current_step - 1) % self.config.model_config.update_every == 0:
             self.m_opt.zero_grad()
         model_loss = self.forward(data, adversary)
 
-        if self.args.model_args.l2_reg > 0:
+        if self.config.model_config.l2_reg > 0:
             param_vec = torch.cat([p.view(-1) for p in self.model.parameters()])
-            model_loss = model_loss + self.args.model_args.l2_reg * torch.sum(
+            model_loss = model_loss + self.config.model_config.l2_reg * torch.sum(
                 param_vec ** 2
             )
 
         model_loss.backward()
-        if self.current_step % self.args.model_args.update_every == 0:
+        if self.current_step % self.config.model_config.update_every == 0:
             # Clip model gradient
-            if self.args.model_args.clip_grad > 0:
+            if self.config.model_config.clip_grad > 0:
                 torch.nn.utils.clip_grad_norm_(
                     self.model.parameters(),
-                    self.args.model_args.clip_grad,
+                    self.config.model_config.clip_grad,
                 )
             # Update params and LR
             self.m_opt.step()
             self.lr_scheduler.step()
 
     def eval(self, data, adversary):
+        self.model.to(self.config.device)
+        adversary.adversary.to(self.config.device)
+        data = data.to(self.config.device)
         self.model.eval()
-        adversary.eval()
+        adversary.adversary.eval()
+        # adversary.eval()
         model_loss = self.forward(data, adversary)
         return model_loss.detach().cpu().numpy()
 
@@ -56,9 +64,9 @@ class p_dro_model:
         task = self.task
         model = self.model
         batch = data
-        adv_args = self.args.adv_args
+        adv_config = self.config.adv_config
         adv = adversary.adversary
-        adv_task = adv.task
+        adv_task = adversary.adv_task
         nlls, _, y_hat = task.nll(
             model,
             batch,
@@ -67,18 +75,18 @@ class p_dro_model:
         )
         # Model errors
         errors = (batch.outputs != y_hat).float().detach()
-        log_Z_model = get_log_running_average(adv_args.norm_k_model)
-        log_Z_adv = get_log_running_average(adv_args.norm_k_adv)
+        log_Z_model = get_log_running_average(adv_config.norm_k_model)
+        log_Z_adv = get_log_running_average(adv_config.norm_k_adv)
         # Transform the minibatch for processing by the adversary
         lm_batch = batch
-        if not (adv_args.joint or adv_args.class_conditional):
+        if not (adv_config.joint or adv_config.class_conditional):
             lm_batch = to_lm_batch(lm_batch)
         # Get log prob of each sample under the adversary
-        if adv_args.ratio_model:
+        if adv_config.ratio_model:
             logits = adv_task.logits(adv, batch)
             y = batch.outputs.to(logits.device)
             log_q = -F.nll_loss(logits, y, reduction="none")
-            if adv_args.renorm_ratios:
+            if adv_config.renorm_ratios:
                 log_q = torch.log_softmax(log_q, dim=0) + np.log(len(log_q))
         else:
             # Get NLL for words
@@ -91,80 +99,84 @@ class p_dro_model:
         # compute the model's loss
         log_Z_model += torch.logsumexp(log_q - log_p, 0).item()
         model_loss = utils.compute_model_loss(
-            nlls, log_q, log_p, adv_args, log_Z_adv, log_Z_model, errors
+            nlls, log_q, log_p, adv_config, log_Z_adv, log_Z_model, errors
         )
 
         return model_loss
 
     def get_model(self):
         # print()
-        model_args = self.args.model_args
-        input_shape = self.args.input_shape
-        model = build_model(model_args.architecture, input_shape, None)
+        model_config = self.config.model_config
+        input_shape = model_config.input_shape
+        model = build_model(model_config.architecture, input_shape, None)
         head = self.task.create_compatible_head(model.hidden_size)
         model = ModelWithHead(model, head)
         return model
 
     def get_opt(self):
         return get_optimizer(
-            self.args.optimizer,
+            self.config.model_config.optimizer,
             list(self.model.parameters()),
-            lr=self.args.lr,
-            weight_decay=self.args.weight_decay,
+            lr=self.config.model_config.lr,
+            weight_decay=self.config.model_config.weight_decay,
         )
 
     def get_lr_scheduler(self):
-        args = self.args
+        config = self.config
         return get_lr_scheduler(
-            args.lr_scheduler,
+            config.model_config.lr_scheduler,
             self.m_opt,
-            args.lr,
-            args.n_steps,
+            config.model_config.lr,
+            config.model_config.n_steps,
         )
 
 
 class p_dro_adversary:
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, config):
+        self.config = config
+        # print(config)
         self.adversary = self.get_adversary()
         self.adv_opt = self.get_opt()
 
-        self.adv_tasks = args.adv_tasks
+        self.adv_task = config.adv_config.adv_task
 
         self.current_step = 0
 
     def train(self, data, model):
-        print()
-        model.eval()
+        model.model.to(self.config.device)
+        self.adversary.to(self.config.device)
+        data = data.to(self.config.device)
+        model.model.eval()
         self.adversary.eval()
         self.current_step += 1
-        adv_args = self.args.adv_args
+        adv_config = self.config.adv_config
         self.adv_opt.zero_grad()
         adv_loss = self.forward(data, model)
         adv_loss.backward()
-        if self.current_step % adv_args.adv_update_every == 0:
+        if self.current_step % adv_config.adv_update_every == 0:
             # Clip adv gradient
-            if adv_args.clip_grad_adv > 0:
+            if adv_config.clip_grad_adv > 0:
                 torch.nn.utils.clip_grad_norm_(
                     self.adversary.parameters(),
-                    adv_args.clip_grad_adv,
+                    adv_config.clip_grad_adv,
                 )
             # Update adversary
             self.adv_opt.step()
 
     def eval(self, data, model):
+        model.model.to(self.config.device)
+        self.adversary.to(self.config.device)
+        data = data.to(self.config.device)
         adv_loss = self.forward(data, model)
         return adv_loss.detach().cpu().numpy()
 
     def forward(self, data, model):
-        # print()
-
         task = model.task
         model = model.model
         batch = data
-        adv_args = self.args.adv_args
+        adv_config = self.config.adv_config
         adv = self.adversary
-        adv_task = adv.task
+        adv_task = self.adv_task
         nlls, _, y_hat = task.nll(
             model,
             batch,
@@ -173,18 +185,18 @@ class p_dro_adversary:
         )
         # Model errors
         errors = (batch.outputs != y_hat).float().detach()
-        log_Z_model = get_log_running_average(adv_args.norm_k_model)
-        log_Z_adv = get_log_running_average(adv_args.norm_k_adv)
+        log_Z_model = get_log_running_average(adv_config.norm_k_model)
+        log_Z_adv = get_log_running_average(adv_config.norm_k_adv)
         # Transform the minibatch for processing by the adversary
         lm_batch = batch
-        if not (adv_args.joint or adv_args.class_conditional):
+        if not (adv_config.joint or adv_config.class_conditional):
             lm_batch = to_lm_batch(lm_batch)
         # Get log prob of each sample under the adversary
-        if adv_args.ratio_model:
+        if adv_config.ratio_model:
             logits = adv_task.logits(adv, batch)
             y = batch.outputs.to(logits.device)
             log_q = -F.nll_loss(logits, y, reduction="none")
-            if adv_args.renorm_ratios:
+            if adv_config.renorm_ratios:
                 log_q = torch.log_softmax(log_q, dim=0) + np.log(len(log_q))
         else:
             # Get NLL for words
@@ -197,25 +209,18 @@ class p_dro_adversary:
         # compute the model's loss
         log_Z_model += torch.logsumexp(log_q - log_p, 0).item()
         # model_loss = utils.compute_model_loss(
-        #     nlls, log_q, log_p, adv_args, log_Z_adv, log_Z_model, errors
+        #     nlls, log_q, log_p, adv_config, log_Z_adv, log_Z_model, errors
         # )
         # Compute the adversary's loss
         adv_loss = utils.compute_adv_loss(
-            nlls, log_q, log_p, adv_args, log_Z_adv, log_Z_model, errors
+            nlls, log_q, log_p, adv_config, log_Z_adv, log_Z_model, errors
         )
         return adv_loss
 
     def get_adversary(self):
-        # print()
-        architecture = self.args.adv_architecture
-        ratio_model = self.args.ratio_model
-        filename = self.args.adv_filename
-        input_shape = self.args.input_shape
-        output_size = self.args.adv_output_size
-        device = self.args.device
         """Create the adversary
 
-        Args:
+        config:
             architecture (str): Architecture
             filename (str): Path to MLE model
             input_shape (Tuple[int, ...]): Shape of the inputs.
@@ -226,6 +231,12 @@ class p_dro_adversary:
         Returns:
             The adversary with the MLE parameters loaded in
         """
+        architecture = self.config.adv_config.adv_architecture
+        ratio_model = self.config.adv_config.ratio_model
+        filename = self.config.adv_config.adv_filename
+        input_shape = self.config.adv_config.input_shape
+        output_size = self.config.adv_config.adv_output_size
+        device = self.config.device
         if ratio_model:
             # In this case, the adversary models the ratio q / p directly.
             # It is a model that takes an input and returns a real number
@@ -252,14 +263,24 @@ class p_dro_adversary:
     def get_opt(self):
         # Optimizer for the adversary
         # Default to the model's optimizer
-        adv_args = self.args.adv_args
-        adv_optimizer = adv_args.adv_optimizer
+        adv_config = self.config.adv_config
+        adv_optimizer = adv_config.adv_optimizer
         # if adv_optimizer is None:
-        #     adv_optimizer = optim_args.optimizer
+        #     adv_optimizer = optim_config.optimizer
         return get_optimizer(
             adv_optimizer,
             list(self.adversary.parameters()),
-            lr=adv_args.adv_lr,
-            mom=adv_args.adv_mom,
-            weight_decay=adv_args.weight_decay,
+            lr=adv_config.adv_lr,
+            mom=adv_config.adv_mom,
+            weight_decay=adv_config.weight_decay,
         )
+
+
+# config = {
+#     "def_lala": 20
+# }
+#
+# p_dro_model_stance = p_dro_proto(config)
+# p_dro_adversary_stance = p_dro_adversary(config=config)
+
+# print(p_dro_model_stance)
