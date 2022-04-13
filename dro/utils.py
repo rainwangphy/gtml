@@ -5,6 +5,7 @@ import scipy
 from src.models import build_model, ModelWithHead
 from src.tasks import task_list, prepare_task
 import traceback
+
 # import numpy as np
 import torch as th
 import torch.nn.functional as F
@@ -28,6 +29,7 @@ from src.logging import NpzLogger
 
 import pdro_args
 from pdro_compare_models import filter_valid_advs
+
 
 def find_tau_star(ell, kappa, log_min=-10, log_max=10):
     # Find \tau^* such that KL(q^*_\tau^* || p) = \kappa
@@ -64,13 +66,13 @@ def find_tau_star(ell, kappa, log_min=-10, log_max=10):
 
 
 def compute_model_loss(
-        losses: torch.Tensor,
-        log_q: torch.Tensor,
-        log_p: torch.Tensor,
-        adv_args,
-        log_Z_adv: LogRunningAverage,
-        log_Z_model: LogRunningAverage,
-        errors,
+    losses: torch.Tensor,
+    log_q: torch.Tensor,
+    log_p: torch.Tensor,
+    adv_args,
+    log_Z_adv: LogRunningAverage,
+    log_Z_model: LogRunningAverage,
+    errors,
 ) -> torch.Tensor:
     """Computes the loss of the model given the model's los and the
     adversary's weights on each sample
@@ -133,13 +135,13 @@ def compute_model_loss(
 
 
 def compute_adv_loss(
-        losses: torch.Tensor,
-        log_q: torch.Tensor,
-        log_p: torch.Tensor,
-        adv_args,
-        log_Z_adv: LogRunningAverage,
-        log_Z_model: LogRunningAverage,
-        errors,
+    losses: torch.Tensor,
+    log_q: torch.Tensor,
+    log_p: torch.Tensor,
+    adv_args,
+    log_Z_adv: LogRunningAverage,
+    log_Z_model: LogRunningAverage,
+    errors,
 ) -> torch.Tensor:
     """Compute the adversary's loss given the model's loss on a batch of
     examples and the weights produced by the adversary
@@ -218,15 +220,15 @@ def compute_adv_loss(
 
 @cacheable(format="pt")
 def compute_dataset_log_probs(
-        lm,
-        task,
-        dataset="train",
-        batch_size=64,
-        max_tokens_per_batch=None,
-        joint=False,
-        class_conditional=False,
-        ratio_model=False,
-        num_workers=1,
+    lm,
+    task,
+    dataset="train",
+    batch_size=64,
+    max_tokens_per_batch=None,
+    joint=False,
+    class_conditional=False,
+    ratio_model=False,
+    num_workers=1,
 ):
     """Compute log probability of every sample in a dataset
 

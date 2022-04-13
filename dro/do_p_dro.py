@@ -68,9 +68,9 @@ class do_p_dro:
                         "adv_optimizer": "sgd",
                         "adv_mom": 0,
                         "lr_scheduler": "linear_decay",
-                        "adv_lr": 1e-4,
+                        "adv_lr": 2e-5,
                         "weight_decay": 0,
-                        "clip_grad_adv": None,
+                        "clip_grad_adv": 0,
                         "adv_update_every": 1,
                         "norm_k_model": None,
                         "norm_k_adv": 5,
@@ -249,12 +249,12 @@ class do_p_dro:
                         len(self.adversary_list), p=self.meta_strategies[1]
                     )
                     model.train(data, self.adversary_list[adv_idx])
-            for _ in range(self.train_max_epoch):
+            for _ in range(1):
                 for i, data in enumerate(self.loader):
                     model_idx = np.random.choice(
                         len(self.model_list), p=self.meta_strategies[0]
                     )
-                    model.train(data, self.model_list[model_idx])
+                    adversary.train(data, self.model_list[model_idx])
                     # batch_idx = np.random.choice(len(self.train_data_loader))
                     # attacker_idx = np.random.choice(
                     #     len(self.attacker_list), p=self.meta_strategies[1]
@@ -333,7 +333,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--solution", type=str, default="the solution for the meta game"
     )
-    parser.add_argument("--train_max_epoch", type=int, default=100)
+    parser.add_argument("--train_max_epoch", type=int, default=5)
     parser.add_argument("--eval_max_epoch", type=int, default=2)
     parser.add_argument("--device", type=str, default="cuda")
 
@@ -341,4 +341,4 @@ if __name__ == "__main__":
     # print()
     do_dro = do_p_dro(args)
     do_dro.init()
-    # do_dro.solve()
+    do_dro.solve()

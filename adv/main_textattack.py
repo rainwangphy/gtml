@@ -649,8 +649,8 @@ class Trainer:
                 if (
                     epoch - num_clean_epochs - 1
                 ) % self.training_args.attack_epoch_interval == 0:
-                    # only generate a new adversarial training set every self.training_args.attack_period epochs after the clean epochs
-                    # adv_dataset is instance of `textattack.datasets.Dataset`
+                    # only generate a new adversarial training set every self.training_args.attack_period epochs
+                    # after the clean epochs adv_dataset is instance of `textattack.datasets.Dataset`
                     model.eval()
                     adv_dataset = self._generate_adversarial_examples(epoch)
                     model.train()
