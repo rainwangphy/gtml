@@ -141,6 +141,7 @@ def main(args):
         logging_interval_step=10,
         random_seed=args.seed,
     )
+    print(training_args)
     trainer = textattack.Trainer(
         model_wrapper,
         "classification",
