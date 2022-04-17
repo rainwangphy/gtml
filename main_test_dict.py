@@ -57,8 +57,10 @@
 # #
 # # print(args)
 
+import numpy as np
 
-a = True
-
-if a:
-    print("s")
+res = np.random.rand(30)
+print(res)
+print(res[-1])
+print(res[:-1])
+print(res[-1] - res[:-1])
