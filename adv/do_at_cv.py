@@ -98,10 +98,16 @@ class do_at:
                 # labels = labels.to(device)
                 end_epoch = True if i == len(self.train_data_loader) else False
                 classifier.train(imgs, labels, end_epoch)
+            # accuracy = 0.0
+            # for i, (imgs, labels) in enumerate(attacker.perturbed_train_dataloader):
+            #     accuracy += classifier.eval(imgs, labels)
+            # accuracy /= len(self.train_data_loader)
+            # print("accuracy: {}".format(accuracy))
         accuracy = 0.0
         for i, (imgs, labels) in enumerate(attacker.perturbed_train_dataloader):
             accuracy += classifier.eval(imgs, labels)
         accuracy /= len(self.train_data_loader)
+        print(accuracy)
 
         self.classifier_list.append(classifier)
         self.attacker_list.append(attacker)
@@ -158,9 +164,9 @@ class do_at:
                     if np.isnan(meta_games[0][t_r][t_c]):
                         accuracy = 0.0
                         for i, (imgs, labels) in enumerate(
-                            attacker.perturbed_train_dataloader
+                            self.attacker_list[t_c].perturbed_train_dataloader
                         ):
-                            accuracy += classifier.eval(imgs, labels)
+                            accuracy += self.classifier_list[t_r].eval(imgs, labels)
                         accuracy /= len(self.train_data_loader)
                         # generator = self.generator_list[t_r]
                         # discriminator = self.discriminator_list[t_c]
@@ -191,11 +197,11 @@ if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--max_loop", type=int, default=4)
+    parser.add_argument("--max_loop", type=int, default=10)
     parser.add_argument(
         "--solution", type=str, default="the solution for the meta game"
     )
-    parser.add_argument("--train_max_epoch", type=int, default=100)
+    parser.add_argument("--train_max_epoch", type=int, default=50)
     parser.add_argument("--eval_max_epoch", type=int, default=2)
     parser.add_argument("--device", type=str, default="cuda")
 

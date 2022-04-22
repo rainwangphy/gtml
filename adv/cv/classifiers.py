@@ -9,7 +9,7 @@ class do_classifier:
         self.args = args
         self.device = args.device
         self.classifier = Wide_ResNet(16, 10, 0.3, 10).to(self.device)
-        self.loss_fn = nn.CrossEntropyLoss(reduction="sum")
+        self.loss_fn = nn.CrossEntropyLoss()
 
         self.optimizer = optim.SGD(
             self.classifier.parameters(),
@@ -34,6 +34,7 @@ class do_classifier:
         self.optimizer.zero_grad()
         loss = self.loss_fn(y, labels)
         loss.backward()
+        # print(loss)
         self.optimizer.step()
         if end_epoch:
             self.scheduler.step()

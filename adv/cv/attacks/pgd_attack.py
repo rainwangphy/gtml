@@ -12,7 +12,7 @@ from __future__ import unicode_literals
 
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 
 import numpy as np
