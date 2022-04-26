@@ -192,12 +192,28 @@ class do_at:
             print(self.meta_games)
             print(self.meta_strategies)
 
+    def eval(self):
+        print()
+        eval_attacker = self.get_attacker()
+        accuracy_list = []
+        for classifier in self.classifier_list:
+            accuracy = 0.0
+            for i in range(len(self.train_data_loader)):
+                (imgs, labels) = eval_attacker.perturbed_train_dataloader[i]
+                accuracy += classifier.eval(imgs, labels)
+            accuracy /= len(self.train_data_loader)
+            accuracy_list.append(accuracy)
+        final_accuracy = 0
+        for i in range(len(self.classifier_list)):
+            final_accuracy += accuracy_list[i] * self.meta_strategies[0][i]
+        print(final_accuracy)
+
 
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--max_loop", type=int, default=10)
+    parser.add_argument("--max_loop", type=int, default=5)
     parser.add_argument(
         "--solution", type=str, default="the solution for the meta game"
     )

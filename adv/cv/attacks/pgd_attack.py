@@ -187,66 +187,69 @@ def perturb_iterative(
     for ii in range(nb_iter):
         # print(ii)
         # delta.grad.data.zero_()
-        delta_mix = torch.zeros_like(delta)
+        delta_grad_mix = torch.zeros_like(delta)
         for i, pred in enumerate(predict):
             # print(i)
-            delta_i = torch.zeros_like(delta)
+            # delta_i = torch.zeros_like(delta)
             outputs = pred.classifier(xvar + delta)
             loss = loss_fn(outputs, yvar)
             if minimize:
                 loss = -loss
 
             loss.backward()
-            # print("back")
-            if ord == np.inf:
-                grad_sign = delta.grad.data.sign()
-                delta_i.data = delta.data + batch_multiply(eps_iter, grad_sign)
-                delta_i.data = batch_clamp(eps, delta_i.data)
-                delta_i.data = (
-                    clamp(xvar.data + delta_i.data, clip_min, clip_max) - xvar.data
-                )
-                # print("delta_i")
-
-            elif ord == 2:
-                grad = delta.grad.data
-                grad = normalize_by_pnorm(grad)
-                delta_i.data = delta.data + batch_multiply(eps_iter, grad)
-                delta_i.data = (
-                    clamp(xvar.data + delta_i.data, clip_min, clip_max) - xvar.data
-                )
-                if eps is not None:
-                    delta_i.data = clamp_by_pnorm(delta_i.data, ord, eps)
-
-            elif ord == 1:
-                grad = delta.grad.data
-                abs_grad = torch.abs(grad)
-
-                batch_size = grad.size(0)
-                view = abs_grad.view(batch_size, -1)
-                view_size = view.size(1)
-                if l1_sparsity is None:
-                    vals, idx = view.topk(1)
-                else:
-                    vals, idx = view.topk(int(np.round((1 - l1_sparsity) * view_size)))
-
-                out = torch.zeros_like(view).scatter_(1, idx, vals)
-                out = out.view_as(grad)
-                grad = grad.sign() * (out > 0).float()
-                grad = normalize_by_pnorm(grad, p=1)
-                delta_i.data = delta.data + batch_multiply(eps_iter, grad)
-
-                delta_i.data = batch_l1_proj(delta_i.data.cpu(), eps)
-                delta_i.data = delta_i.data.to(xvar.device)
-                delta_i.data = (
-                    clamp(xvar.data + delta_i.data, clip_min, clip_max) - xvar.data
-                )
-            else:
-                error = "Only ord = inf, ord = 1 and ord = 2 have been implemented"
-                raise NotImplementedError(error)
-
-            delta_mix.data += predict_dis[i] * delta_i.data
+            delta_grad_mix += predict_dis[i] * delta.grad.data
             delta.grad.data.zero_()
-        delta.data = delta_mix.data
+
+        # print("back")
+        if ord == np.inf:
+            grad_sign = delta_grad_mix.sign()
+            delta.data = delta.data + batch_multiply(eps_iter, grad_sign)
+            delta.data = batch_clamp(eps, delta.data)
+            delta.data = (
+                clamp(xvar.data + delta.data, clip_min, clip_max) - xvar.data
+            )
+            # print("delta_i")
+
+        elif ord == 2:
+            grad = delta_grad_mix
+            grad = normalize_by_pnorm(grad)
+            delta.data = delta.data + batch_multiply(eps_iter, grad)
+            delta.data = (
+                clamp(xvar.data + delta.data, clip_min, clip_max) - xvar.data
+            )
+            if eps is not None:
+                delta.data = clamp_by_pnorm(delta.data, ord, eps)
+
+        elif ord == 1:
+            grad = delta_grad_mix
+            abs_grad = torch.abs(grad)
+
+            batch_size = grad.size(0)
+            view = abs_grad.view(batch_size, -1)
+            view_size = view.size(1)
+            if l1_sparsity is None:
+                vals, idx = view.topk(1)
+            else:
+                vals, idx = view.topk(int(np.round((1 - l1_sparsity) * view_size)))
+
+            out = torch.zeros_like(view).scatter_(1, idx, vals)
+            out = out.view_as(grad)
+            grad = grad.sign() * (out > 0).float()
+            grad = normalize_by_pnorm(grad, p=1)
+            delta.data = delta.data + batch_multiply(eps_iter, grad)
+
+            delta.data = batch_l1_proj(delta.data.cpu(), eps)
+            delta.data = delta.data.to(xvar.device)
+            delta.data = (
+                clamp(xvar.data + delta.data, clip_min, clip_max) - xvar.data
+            )
+        else:
+            error = "Only ord = inf, ord = 1 and ord = 2 have been implemented"
+            raise NotImplementedError(error)
+            #
+            # delta_mix.data += predict_dis[i] * delta_i.data
+            # delta.grad.data.zero_()
+        # delta.data = delta_mix.data
         delta.grad.data.zero_()
 
     x_adv = clamp(xvar + delta, clip_min, clip_max)
