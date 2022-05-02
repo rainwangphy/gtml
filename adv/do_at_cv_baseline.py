@@ -1,6 +1,6 @@
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import argparse
 import numpy as np
@@ -26,7 +26,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--max_loop", type=int, default=10)
 parser.add_argument("--solution", type=str, default="the solution for the meta game")
-parser.add_argument("--train_max_epoch", type=int, default=50)
+parser.add_argument("--train_max_epoch", type=int, default=200)
 parser.add_argument("--eval_max_epoch", type=int, default=2)
 parser.add_argument("--device", type=str, default="cuda")
 
@@ -114,3 +114,7 @@ for (imgs, labels) in train_loader:
     accuracy += predicted.eq(labels).sum().item() / len(labels)
     # print(accuracy)
 print(accuracy / len(train_loader))
+pretrain_dir = "./pretrained_models/"
+torch.save(
+    do_predict.classifier, pretrain_dir + "pgd_classifier_{}.pth".format(args.nb_iter)
+)

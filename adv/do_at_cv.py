@@ -8,7 +8,8 @@ import numpy as np
 # import torch
 import torch.utils.data
 
-# import torch.nn as nn
+import torch.nn as nn
+
 # import tqdm
 # import os
 import torch
@@ -21,6 +22,9 @@ from torchvision import datasets, transforms
 from meta_solvers.prd_solver import projected_replicator_dynamics
 from cv.classifiers import do_classifier
 from cv.attacks.pgd_attack import pgd_attacker
+import torch.optim as optim
+from torch.optim import lr_scheduler
+from adv.cv.attacks.pgd_attack import LinfPGDAttack
 
 
 class do_at:
@@ -32,6 +36,8 @@ class do_at:
         self.eval_max_epoch = args.eval_max_epoch
         self.device = args.device
         self.train_data_loader = None
+
+        self.pretrain_dir = "./pretrained_models/"
 
         # self.criterion = nn.CrossEntropyLoss()
         self.classifier_list = []
@@ -57,6 +63,7 @@ class do_at:
             "predict_dis": self.meta_strategies[0],
             "clean_train_dataloader": self.train_data_loader,
             "device": self.device,
+            "nb_iter": self.args.nb_iter,
         }
         return pgd_attacker(config)
 
@@ -78,31 +85,85 @@ class do_at:
             ),
             batch_size=256,
             shuffle=True,
-            num_workers=0,
+            num_workers=4,
             drop_last=True,
         )
         return train_loader
+
+    def at_init(self, do_predict):
+        # print()
+        load = True
+        if load:
+            print()
+            classifier = torch.load(
+                self.pretrain_dir + "pgd_classifier_{}.pth".format(self.args.nb_iter)
+            )
+            do_predict.classifier = classifier
+        else:
+            device = self.device
+            loss_fn = nn.CrossEntropyLoss()
+
+            optimizer = optim.SGD(
+                do_predict.classifier.parameters(),
+                lr=args.lr,
+                momentum=args.momentum,
+                weight_decay=args.weight_decay,
+            )
+            scheduler = lr_scheduler.MultiStepLR(
+                optimizer,
+                milestones=args.milestones,
+                gamma=args.gamma,
+                last_epoch=-1,
+            )
+
+            attack = LinfPGDAttack(
+                predict=[do_predict], predict_dis=[1.0], nb_iter=args.nb_iter
+            )
+
+            do_predict.classifier.train()
+            max_epochs = args.at_init_max_epochs
+            for _ in range(max_epochs):
+                for i, (imgs, labels) in enumerate(self.train_data_loader):
+                    print(i)
+                    imgs = imgs.to(device)
+                    labels = labels.to(device)
+                    perturbed_x = attack.perturb(imgs, labels)
+                    output_y = do_predict.classifier(perturbed_x)
+                    optimizer.zero_grad()
+                    loss = loss_fn(output_y, labels)
+                    loss.backward()
+                    # print(loss)
+                    optimizer.step()
+                scheduler.step()
+            torch.save(
+                do_predict.classifier,
+                self.pretrain_dir + "pgd_classifier_{}.pth".format(self.args.nb_iter),
+            )
 
     def init(self):
         # print("init")
         self.train_data_loader = self.get_dataset()
         classifier = self.get_classifier()
-        attacker = self.get_attacker()
-        # device = self.device
-        # classifier.train()
-        for epoch in range(self.train_max_epoch):
-            # print(epoch)
-            for i, (imgs, labels) in enumerate(attacker.perturbed_train_dataloader):
-                # print(i)
-                # imgs = imgs.to(device)
-                # labels = labels.to(device)
-                end_epoch = True if i == len(self.train_data_loader) else False
-                classifier.train(imgs, labels, end_epoch)
-            # accuracy = 0.0
-            # for i, (imgs, labels) in enumerate(attacker.perturbed_train_dataloader):
-            #     accuracy += classifier.eval(imgs, labels)
-            # accuracy /= len(self.train_data_loader)
-            # print("accuracy: {}".format(accuracy))
+        if args.at_init:
+            self.at_init(classifier)
+            attacker = self.get_attacker()
+        else:
+            attacker = self.get_attacker()
+            # device = self.device
+            # classifier.train()
+            for epoch in range(self.train_max_epoch):
+                # print(epoch)
+                for i, (imgs, labels) in enumerate(attacker.perturbed_train_dataloader):
+                    # print(i)
+                    # imgs = imgs.to(device)
+                    # labels = labels.to(device)
+                    end_epoch = True if i == len(self.train_data_loader) else False
+                    classifier.train(imgs, labels, end_epoch)
+                # accuracy = 0.0
+                # for i, (imgs, labels) in enumerate(attacker.perturbed_train_dataloader):
+                #     accuracy += classifier.eval(imgs, labels)
+                # accuracy /= len(self.train_data_loader)
+                # print("accuracy: {}".format(accuracy))
         accuracy = 0.0
         for i, (imgs, labels) in enumerate(attacker.perturbed_train_dataloader):
             accuracy += classifier.eval(imgs, labels)
@@ -126,8 +187,9 @@ class do_at:
             classifier = self.get_classifier()
             print("get attacker")
             attacker = self.get_attacker()
+            self.eval(eval_attacker=attacker)
             print("train classifier")
-            for _ in range(self.train_max_epoch):
+            for _ in range(min(self.train_max_epoch * (loop + 1), 150)):
                 for i in range(len(self.train_data_loader)):
                     batch_idx = np.random.choice(len(self.train_data_loader))
                     attacker_idx = np.random.choice(
@@ -192,9 +254,11 @@ class do_at:
             print(self.meta_games)
             print(self.meta_strategies)
 
-    def eval(self):
-        print()
+    def final_eval(self):
         eval_attacker = self.get_attacker()
+        self.eval(eval_attacker)
+
+    def eval(self, eval_attacker):
         accuracy_list = []
         for classifier in self.classifier_list:
             accuracy = 0.0
@@ -206,7 +270,7 @@ class do_at:
         final_accuracy = 0
         for i in range(len(self.classifier_list)):
             final_accuracy += accuracy_list[i] * self.meta_strategies[0][i]
-        print(final_accuracy)
+        print("current final accuracy: {}".format(final_accuracy))
 
 
 if __name__ == "__main__":
@@ -220,6 +284,9 @@ if __name__ == "__main__":
     parser.add_argument("--train_max_epoch", type=int, default=50)
     parser.add_argument("--eval_max_epoch", type=int, default=2)
     parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--at_init", type=bool, default=True)
+    parser.add_argument("--at_init_max_epochs", type=int, default=50)
+    parser.add_argument("--nb_iter", type=int, default=5)
 
     parser.add_argument("--lr", type=float, default=0.1)
     parser.add_argument("--weight_decay", type=float, default=2e-4)
@@ -231,3 +298,5 @@ if __name__ == "__main__":
     do_at_pgd = do_at(args)
     do_at_pgd.init()
     do_at_pgd.solve()
+    # do_at_pgd.eval()
+    do_at_pgd.final_eval()

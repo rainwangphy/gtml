@@ -4,13 +4,11 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import argparse
 import numpy as np
-import torch
 import torch.utils.data
 import tqdm
 import os
 import torch
-from torch.utils.data import DataLoader
-from gan import wgan
+from gan.gan_impl import wgan
 
 from torchvision import datasets, transforms
 from meta_solvers.prd_solver import projected_replicator_dynamics

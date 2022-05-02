@@ -205,18 +205,14 @@ def perturb_iterative(
             grad_sign = delta_grad_mix.sign()
             delta.data = delta.data + batch_multiply(eps_iter, grad_sign)
             delta.data = batch_clamp(eps, delta.data)
-            delta.data = (
-                clamp(xvar.data + delta.data, clip_min, clip_max) - xvar.data
-            )
+            delta.data = clamp(xvar.data + delta.data, clip_min, clip_max) - xvar.data
             # print("delta_i")
 
         elif ord == 2:
             grad = delta_grad_mix
             grad = normalize_by_pnorm(grad)
             delta.data = delta.data + batch_multiply(eps_iter, grad)
-            delta.data = (
-                clamp(xvar.data + delta.data, clip_min, clip_max) - xvar.data
-            )
+            delta.data = clamp(xvar.data + delta.data, clip_min, clip_max) - xvar.data
             if eps is not None:
                 delta.data = clamp_by_pnorm(delta.data, ord, eps)
 
@@ -240,9 +236,7 @@ def perturb_iterative(
 
             delta.data = batch_l1_proj(delta.data.cpu(), eps)
             delta.data = delta.data.to(xvar.device)
-            delta.data = (
-                clamp(xvar.data + delta.data, clip_min, clip_max) - xvar.data
-            )
+            delta.data = clamp(xvar.data + delta.data, clip_min, clip_max) - xvar.data
         else:
             error = "Only ord = inf, ord = 1 and ord = 2 have been implemented"
             raise NotImplementedError(error)
@@ -485,7 +479,9 @@ class pgd_attacker:
         self.perturbed_train_dataloader = None
         if len(self.predict) != 0:
             self.attack = LinfPGDAttack(
-                predict=self.predict, predict_dis=self.predict_dis, nb_iter=5
+                predict=self.predict,
+                predict_dis=self.predict_dis,
+                nb_iter=config["nb_iter"],
             )
         else:
             self.attack = None
