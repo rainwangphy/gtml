@@ -74,7 +74,7 @@ def get_inception_feature(
     while start < num_images:
         # get a batch of images from iterator
         if is_dataloader:
-            batch_images = next(looper)[0]  # TODO: note, discarding the labels
+            batch_images = next(looper)  # TODO: note, discarding the labels
         else:
             batch_images = images[start : start + batch_size]
         end = start + len(batch_images)

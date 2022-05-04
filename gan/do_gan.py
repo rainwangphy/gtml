@@ -12,6 +12,7 @@ from gan.gan_impl import wgan
 
 from torchvision import datasets, transforms
 from meta_solvers.prd_solver import projected_replicator_dynamics
+from torch.utils.data import DataLoader
 
 
 class do_gan:
@@ -39,33 +40,52 @@ class do_gan:
         ]
 
     def get_generator(self):
+        args = self.args
         return wgan.wgan_generator(args)
 
     def get_discriminator(self):
+        args = self.args
         return wgan.wgan_discriminator(args)
 
     def get_dataset(self):
         #########################
         # Load and preprocess data for model
         #########################
-        os.makedirs("../../data/mnist", exist_ok=True)
-        opt = self.args
-        dataloader = torch.utils.data.DataLoader(
-            datasets.MNIST(
-                "../../data/mnist",
-                train=True,
-                download=True,
-                transform=transforms.Compose(
-                    [
-                        transforms.Resize(opt.img_size),
-                        transforms.ToTensor(),
-                        transforms.Normalize([0.5], [0.5]),
-                    ]
-                ),
+        # os.makedirs("../../data/mnist", exist_ok=True)
+        # opt = self.args
+        # dataloader = torch.utils.data.DataLoader(
+        #     datasets.MNIST(
+        #         "../../data/mnist",
+        #         train=True,
+        #         download=True,
+        #         transform=transforms.Compose(
+        #             [
+        #                 transforms.Resize(opt.img_size),
+        #                 transforms.ToTensor(),
+        #                 transforms.Normalize([0.5], [0.5]),
+        #             ]
+        #         ),
+        #     ),
+        #     batch_size=opt.batch_size,
+        #     shuffle=True,
+        # )
+        # dataset = ImageDataset(path_to_dir, exts=["png", "jpg"])
+        args = self.args
+        input_size = args.img_size
+        dataroot = "./data/cifar10"
+        dataset = datasets.CIFAR10(
+            root=dataroot,
+            train=True,
+            download=True,
+            transform=transforms.Compose(
+                [
+                    transforms.Resize((input_size, input_size)),
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                ]
             ),
-            batch_size=opt.batch_size,
-            shuffle=True,
         )
+        dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=4)
         return dataloader
 
     def init(self):
@@ -179,6 +199,9 @@ class do_gan:
             self.meta_strategies = projected_replicator_dynamics(self.meta_games)
             print(self.meta_games)
             print(self.meta_strategies)
+
+    def final_eval(self):
+        print("final evaluation of the generator")
 
 
 if __name__ == "__main__":

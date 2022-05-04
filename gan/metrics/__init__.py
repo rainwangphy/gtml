@@ -1,3 +1,7 @@
+"""
+Code from: https://github.com/w86763777/pytorch-gan-metrics
+"""
+
 from gan.metrics.utils import (
     ImageDataset,
     get_inception_score,

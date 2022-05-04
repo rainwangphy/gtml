@@ -27,6 +27,7 @@ class Generator(nn.Module):
         self.args = args
 
         opt = args
+        self.latent_dim = args.latent_dim
         self.img_shape = (opt.channels, opt.img_size, opt.img_size)
         img_shape = self.img_shape
 
