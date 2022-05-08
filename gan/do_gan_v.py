@@ -8,7 +8,7 @@ import torch.utils.data
 import tqdm
 import os
 import torch
-from gan.gan_impl import wgan as gan_gen
+from gan.gan_impl import v_gan as gan_gen
 
 from torchvision import datasets, transforms
 from meta_solvers.prd_solver import projected_replicator_dynamics
@@ -47,11 +47,11 @@ class do_gan:
 
     def get_generator(self):
         args = self.args
-        return gan_gen.wgan_generator(args)
+        return gan_gen.gan_generator(args)
 
     def get_discriminator(self):
         args = self.args
-        return gan_gen.wgan_discriminator(args)
+        return gan_gen.gan_discriminator(args)
 
     def get_dataset(self):
         #########################
@@ -97,8 +97,8 @@ class do_gan:
     def gan_init(self, do_generator, do_discriminator):
         load = False
         if load:
-            generator = torch.load("wgan_generator.pth")
-            discriminator = torch.load('wgan_discriminator.pth')
+            generator = torch.load("gan_generator.pth")
+            discriminator = torch.load("gan_discriminator.pth")
             do_generator.generator = generator
             do_discriminator.discriminator = discriminator
         else:
@@ -123,65 +123,8 @@ class do_gan:
                     do_discriminator.train(data, do_generator, True)
                     if i % opt.n_critic == 0:
                         do_generator.train(data, do_discriminator, True)
-            torch.save(do_generator.generator, "wgan_generator.pth")
-            torch.save(do_discriminator.discriminator, "wgan_discriminator.pth")
-            # # Configure input
-            # # real_imgs = Variable(imgs.type(Tensor))
-            # # Sample noise as generator input
-            # real_imgs = imgs.to(self.args.device)
-            # z = torch.tensor(
-            #     np.random.normal(0, 1, (real_imgs.shape[0], opt.latent_dim)),
-            #     dtype=torch.float32,
-            # ).to(self.args.device)
-            # # ---------------------
-            # #  Train Discriminator
-            # # ---------------------
-            #
-            # optimizer_D.zero_grad()
-
-            # Sample noise as generator input
-            # z = Variable(Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim))))
-
-            # # Generate a batch of images
-            # fake_imgs = generator(z)
-            #
-            # # Real images
-            # real_validity = discriminator(real_imgs)
-            # # Fake images
-            # fake_validity = discriminator(fake_imgs)
-            # # Gradient penalty
-            # gradient_penalty = do_discriminator.compute_gradient_penalty(
-            #     real_imgs.data, fake_imgs.data
-            # )
-            # # Adversarial loss
-            # d_loss = (
-            #     -torch.mean(real_validity)
-            #     + torch.mean(fake_validity)
-            #     + lambda_gp * gradient_penalty
-            # )
-            #
-            # d_loss.backward()
-            # # print("d loss: {}".format(d_loss))
-            # optimizer_D.step()
-            #
-            # optimizer_G.zero_grad()
-            #
-            # # Train the generator every n_critic steps
-            # if i % opt.n_critic == 0:
-            #     # -----------------
-            #     #  Train Generator
-            #     # -----------------
-            #
-            #     # Generate a batch of images
-            #     fake_imgs = generator(z)
-            #     # Loss measures generator's ability to fool the discriminator
-            #     # Train on fake images
-            #     fake_validity = discriminator(fake_imgs)
-            #     g_loss = -torch.mean(fake_validity)
-            #
-            #     g_loss.backward()
-            #     # print("g loss: {}".format(g_loss))
-            #     optimizer_G.step()
+            torch.save(do_generator.generator, "gan_generator.pth")
+            torch.save(do_discriminator.discriminator, "gan_discriminator.pth")
 
     def init(self):
         self.data = self.get_dataset()
@@ -255,7 +198,7 @@ class do_gan:
                     data = {"real_imgs": imgs}
                     generator.train(data, self.discriminator_list[dis_idx])
             logger = tqdm.trange(
-                int(2 * self.args.train_max_epoch * (loop + 1)),
+                int(self.args.train_max_epoch * (loop + 1)),
                 desc=f"train the discriminator {loop}",
             )
             for epoch in logger:
@@ -343,7 +286,7 @@ if __name__ == "__main__":
         "--batch_size", type=int, default=64, help="size of the batches"
     )
     parser.add_argument(
-        "--lambda_gp", type=float, default=0, help="gradient penalty for WGAN"
+        "--lambda_gp", type=float, default=10.0, help="gradient penalty for WGAN"
     )
     parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
     parser.add_argument(

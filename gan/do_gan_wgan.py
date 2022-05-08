@@ -343,7 +343,7 @@ if __name__ == "__main__":
         "--batch_size", type=int, default=64, help="size of the batches"
     )
     parser.add_argument(
-        "--lambda_gp", type=float, default=0, help="gradient penalty for WGAN"
+        "--lambda_gp", type=float, default=10.0, help="gradient penalty for WGAN"
     )
     parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
     parser.add_argument(

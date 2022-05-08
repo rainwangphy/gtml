@@ -67,6 +67,7 @@ class Discriminator(nn.Module):
             nn.Linear(512, 256),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(256, 1),
+            nn.Sigmoid(),
         )
 
     def forward(self, img):
@@ -85,11 +86,15 @@ class wgan_generator:
             self.generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
         )
 
-    def train(self, data, wgan_discriminator):
+    def train(self, data, wgan_discriminator, is_train=True):
         # print()
         self.generator.train()
         discriminator = wgan_discriminator.discriminator
-        discriminator.eval()
+        if is_train:
+            discriminator.train()
+        else:
+            discriminator.eval()
+        # discriminator.train()
         self.g_opt.zero_grad()
         g_loss = self.forward(data, discriminator)
         g_loss.backward()
@@ -120,6 +125,7 @@ class wgan_generator:
         # Train on fake images
         fake_validity = discriminator(fake_imgs)
         g_loss = -torch.mean(fake_validity)
+        # print("iter g_loss: {}".format(g_loss))
         return g_loss
 
 
@@ -134,14 +140,18 @@ class wgan_discriminator:
             self.discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
         )
 
-    def train(self, data, wgan_generator):
+    def train(self, data, wgan_generator, is_train=True):
         # print()
         # real_imgs = data['real_imgs']
         #
         # Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
         self.discriminator.train()
         generator = wgan_generator.generator
-        generator.eval()
+        if is_train:
+            generator.train()
+        else:
+            generator.eval()
+        # generator.train()
         self.d_opt.zero_grad()
         d_loss = self.forward(data, generator)
         d_loss.backward()
@@ -201,13 +211,21 @@ class wgan_discriminator:
         # Fake images
         fake_validity = self.discriminator(fake_imgs)
         # Gradient penalty
-        gradient_penalty = self.compute_gradient_penalty(real_imgs.data, fake_imgs.data)
-        # Adversarial loss
-        d_loss = (
-            -torch.mean(real_validity)
-            + torch.mean(fake_validity)
-            + self.lambda_gp * gradient_penalty
-        )
+        if self.lambda_gp > 0:
+            gradient_penalty = self.compute_gradient_penalty(real_imgs.data, fake_imgs.data)
+            # Adversarial loss
+            d_loss = (
+                -torch.mean(real_validity)
+                + torch.mean(fake_validity)
+                + self.lambda_gp * gradient_penalty
+            )
+        else:
+            d_loss = (
+                    -torch.mean(real_validity)
+                    + torch.mean(fake_validity)
+                    # + self.lambda_gp * gradient_penalty
+            )
+        # print("iter d_loss: {}".format(d_loss))
         return d_loss
 
 
