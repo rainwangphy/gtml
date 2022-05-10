@@ -98,7 +98,7 @@ class do_gan:
         load = False
         if load:
             generator = torch.load("wgan_generator.pth")
-            discriminator = torch.load('wgan_discriminator.pth')
+            discriminator = torch.load("wgan_discriminator.pth")
             do_generator.generator = generator
             do_discriminator.discriminator = discriminator
         else:
@@ -255,7 +255,7 @@ class do_gan:
                     data = {"real_imgs": imgs}
                     generator.train(data, self.discriminator_list[dis_idx])
             logger = tqdm.trange(
-                int(2 * self.args.train_max_epoch * (loop + 1)),
+                int(self.args.n_critic * self.args.train_max_epoch * (loop + 1)),
                 desc=f"train the discriminator {loop}",
             )
             for epoch in logger:
@@ -307,7 +307,8 @@ class do_gan:
             self.meta_strategies = projected_replicator_dynamics(self.meta_games)
             print(self.meta_games)
             print(self.meta_strategies)
-            self.eval_one_generator(idx=-1)
+            # self.eval_one_generator(idx=-1)
+            self.eval_generator_list()
 
     def final_eval(self):
         print("final evaluation of the generator")
@@ -323,6 +324,15 @@ class do_gan:
         dict_score = eval_gan(generator=self.generator_list[idx].generator)
         print(dict_score)
 
+    def eval_generator_list(self):
+        from gan.gan_eval import eval_gan_list
+
+        dict_score = eval_gan_list(
+            generator_list=self.generator_list,
+            generator_distribution=self.meta_strategies[0],
+        )
+        print(dict_score)
+
 
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
@@ -332,7 +342,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--solution", type=str, default="the solution for the meta game"
     )
-    parser.add_argument("--train_max_epoch", type=int, default=50)
+    parser.add_argument("--train_max_epoch", type=int, default=100)
     parser.add_argument("--eval_max_epoch", type=int, default=20)
     parser.add_argument("--device", type=str, default="cuda")
 
@@ -376,7 +386,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_critic",
         type=int,
-        default=5,
+        default=3,
         help="number of training steps for discriminator per iter",
     )
     parser.add_argument(

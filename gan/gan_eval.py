@@ -35,6 +35,41 @@ def eval_gan(generator):
     return dict_score
 
 
+class GeneratorListDataset(Dataset):
+    def __init__(self, G_list, dis):
+        self.G_list = G_list
+        self.dis = dis
+        self.z_dim = self.G_list[0].generator.latent_dim
+        self.device = next(self.G_list[0].generator.parameters()).device
+
+    def __len__(self):
+        return 50000
+
+    def __getitem__(self, index):
+        # z = torch.randn(1, self.z_dim).to(self.device)
+        z = torch.tensor(
+            np.random.normal(0, 1, (1, self.z_dim)), dtype=torch.float32
+        ).to(self.device)
+        gen_idx = np.random.choice(range(len(self.G_list)), p=self.dis)
+        return (self.G_list[gen_idx].generator(z).detach()[0] + torch.tensor(1.0)) / 2.0
+
+
+def eval_gan_list(generator_list, generator_distribution):
+    from gan.metrics.utils import (
+        get_inception_score,
+        get_fid,
+    )
+
+    for generator in generator_list:
+        generator.generator.eval()
+    dataset = GeneratorListDataset(G_list=generator_list, dis=generator_distribution)
+    loader = DataLoader(dataset, batch_size=50, num_workers=0)
+
+    dict_score = {"inception_score": get_inception_score(loader, use_torch=True)}
+
+    return dict_score
+
+
 #
 # import argparse
 #

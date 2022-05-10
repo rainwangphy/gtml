@@ -130,6 +130,9 @@ class gan_generator:
             self.generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
         )
 
+        self.train_steps = 0
+        self.train_interval = 5
+
     def train(self, data, gan_discriminator, is_train=True):
         # print()
         self.generator.train()
@@ -139,10 +142,16 @@ class gan_generator:
         else:
             discriminator.eval()
         # discriminator.train()
-        self.g_opt.zero_grad()
+        if ((self.train_steps - 1) % self.train_interval == 0) or (
+            self.train_steps == 0
+        ):
+            # discriminator.train()
+            self.g_opt.zero_grad()
         g_loss = self.forward(data, discriminator)
         g_loss.backward()
-        self.g_opt.step()
+        if self.train_steps % self.train_interval == 0:
+            self.g_opt.step()
+        self.train_steps += 1
 
     def eval(self, data, gan_discriminator):
         self.generator.eval()
@@ -189,6 +198,9 @@ class gan_discriminator:
             self.discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
         )
 
+        self.train_steps = 0
+        self.train_interval = 5
+
     def train(self, data, gan_generator, is_train=True):
         # print()
         # real_imgs = data['real_imgs']
@@ -201,10 +213,15 @@ class gan_discriminator:
         else:
             generator.eval()
         # generator.train()
-        self.d_opt.zero_grad()
+        if ((self.train_steps - 1) % self.train_interval == 0) or (
+            self.train_steps == 0
+        ):
+            self.d_opt.zero_grad()
         d_loss = self.forward(data, generator)
         d_loss.backward()
-        self.d_opt.step()
+        if self.train_steps % self.train_interval == 0:
+            self.d_opt.step()
+        self.train_steps += 1
 
     def eval(self, data, gan_generator):
         generator = gan_generator.generator

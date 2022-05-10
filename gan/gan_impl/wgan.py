@@ -86,6 +86,9 @@ class wgan_generator:
             self.generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
         )
 
+        self.train_steps = 0
+        self.train_interval = 5
+
     def train(self, data, wgan_discriminator, is_train=True):
         # print()
         self.generator.train()
@@ -94,11 +97,16 @@ class wgan_generator:
             discriminator.train()
         else:
             discriminator.eval()
-        # discriminator.train()
-        self.g_opt.zero_grad()
+        if ((self.train_steps - 1) % self.train_interval == 0) or (
+            self.train_steps == 0
+        ):
+            # discriminator.train()
+            self.g_opt.zero_grad()
         g_loss = self.forward(data, discriminator)
         g_loss.backward()
-        self.g_opt.step()
+        if self.train_steps % self.train_interval == 0:
+            self.g_opt.step()
+        self.train_steps += 1
 
     def eval(self, data, wgan_discriminator):
         self.generator.eval()
@@ -140,6 +148,9 @@ class wgan_discriminator:
             self.discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2)
         )
 
+        self.train_steps = 0
+        self.train_interval = 5
+
     def train(self, data, wgan_generator, is_train=True):
         # print()
         # real_imgs = data['real_imgs']
@@ -152,10 +163,15 @@ class wgan_discriminator:
         else:
             generator.eval()
         # generator.train()
-        self.d_opt.zero_grad()
+        if ((self.train_steps - 1) % self.train_interval == 0) or (
+            self.train_steps == 0
+        ):
+            self.d_opt.zero_grad()
         d_loss = self.forward(data, generator)
         d_loss.backward()
-        self.d_opt.step()
+        if self.train_steps % self.train_interval == 0:
+            self.d_opt.step()
+        self.train_steps += 1
 
     def eval(self, data, wgan_generator):
         generator = wgan_generator.generator
@@ -212,7 +228,9 @@ class wgan_discriminator:
         fake_validity = self.discriminator(fake_imgs)
         # Gradient penalty
         if self.lambda_gp > 0:
-            gradient_penalty = self.compute_gradient_penalty(real_imgs.data, fake_imgs.data)
+            gradient_penalty = self.compute_gradient_penalty(
+                real_imgs.data, fake_imgs.data
+            )
             # Adversarial loss
             d_loss = (
                 -torch.mean(real_validity)
@@ -221,9 +239,9 @@ class wgan_discriminator:
             )
         else:
             d_loss = (
-                    -torch.mean(real_validity)
-                    + torch.mean(fake_validity)
-                    # + self.lambda_gp * gradient_penalty
+                -torch.mean(real_validity)
+                + torch.mean(fake_validity)
+                # + self.lambda_gp * gradient_penalty
             )
         # print("iter d_loss: {}".format(d_loss))
         return d_loss
