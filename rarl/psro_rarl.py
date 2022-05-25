@@ -1,8 +1,16 @@
 from rarl.agent import Agent
 from rarl.envs.adversarial.mujoco.hopper_torso_6 import HopperTorso6Env
+# from rarl.envs.adversarial.mujoco.walker2d import Walker2dEnv
+from rarl.envs.adversarial.mujoco.walker2d_torso import Walker2dTorsoEnv
 import numpy as np
 from meta_solvers.prd_solver import projected_replicator_dynamics
 import argparse
+
+
+def soft_update(online, target, tau=0.9):
+    for param1, param2 in zip(target.parameters(), online.parameters()):
+        param1.data *= 1.0 - tau
+        param1.data += param2.data * tau
 
 
 class psro_rarl:
@@ -37,7 +45,9 @@ class psro_rarl:
 
         gym.logger.set_level(40)
         # env_name = self.args.env_name
-        env = HopperTorso6Env()
+        # env = HopperTorso6Env()
+        env = Walker2dTorsoEnv()
+        # env = Walker2dEnv()
         return env
 
     def get_agent(self, agent_idx):
@@ -86,10 +96,21 @@ class psro_rarl:
 
         return Agent(config)
 
+    def rarl_init(self, agent, adversary):
+        max_steps = self.args.rarl_init_max_episode * self.args.max_ep_len
+        while True:
+            agent.train(o_agent=adversary)
+            adversary.train(o_agent=agent)
+            if adversary.current_step > max_steps and agent.current_step > max_steps:
+                break
+
     def init(self):
         agent = self.get_agent(agent_idx=0)
         adversary = self.get_agent(agent_idx=1)
 
+        rarl_init = True
+        if rarl_init:
+            self.rarl_init(agent, adversary)
         # pro_reward = 0.0
         # adv_reward = 0.0
 
@@ -113,6 +134,15 @@ class psro_rarl:
         for loop in range(self.max_loop):
             agent = self.get_agent(agent_idx=0)
             adversary = self.get_agent(agent_idx=1)
+
+            use_soft_update = True
+            if use_soft_update:
+                soft_update(agent.ppo_agent.policy, self.pro_list[-1].ppo_agent.policy)
+                soft_update(
+                    adversary.ppo_agent.policy, self.adv_list[-1].ppo_agent.policy
+                )
+                agent.ppo_agent.update_policy_old()
+                adversary.ppo_agent.update_policy_old()
 
             max_steps = self.train_max_episode * self.args.max_ep_len
             while True:
@@ -163,6 +193,9 @@ class psro_rarl:
             print(self.meta_games)
             print(self.meta_strategies)
 
+    def eval(self):
+        print()
+
 
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
@@ -172,7 +205,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--solution", type=str, default="the solution for the meta game"
     )
-    parser.add_argument("--train_max_episode", type=int, default=100)
+    parser.add_argument("--train_max_episode", type=int, default=500)
+    parser.add_argument("--rarl_init_max_episode", type=int, default=1000)
     parser.add_argument("--eval_max_episode", type=int, default=100)
 
     parser.add_argument("--max_ep_len", type=int, default=1000)

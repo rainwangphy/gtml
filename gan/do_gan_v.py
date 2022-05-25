@@ -286,9 +286,7 @@ if __name__ == "__main__":
         "--solution", type=str, default="the solution for the meta game"
     )
 
-    parser.add_argument(
-        "--loss", type=str, default="bce"
-    )
+    parser.add_argument("--loss", type=str, default="bce")
     parser.add_argument("--train_max_epoch", type=int, default=100)
     parser.add_argument("--eval_max_epoch", type=int, default=20)
     parser.add_argument("--device", type=str, default="cuda")
@@ -345,7 +343,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--sample_interval", type=int, default=400, help="interval betwen image samples"
     )
-
 
     opt = parser.parse_args()
     args = parser.parse_args()

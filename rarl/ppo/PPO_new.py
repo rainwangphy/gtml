@@ -355,3 +355,6 @@ class PPO:
         self.policy.load_state_dict(
             torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
         )
+
+    def update_policy_old(self):
+        self.policy_old.load_state_dict(self.policy.state_dict())
