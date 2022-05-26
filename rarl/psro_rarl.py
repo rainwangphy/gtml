@@ -5,6 +5,7 @@ from rarl.envs.adversarial.mujoco.walker2d_torso import Walker2dTorsoEnv
 import numpy as np
 from meta_solvers.prd_solver import projected_replicator_dynamics
 import argparse
+from rarl.utils import setup_seed
 
 
 def soft_update(online, target, tau=0.9):
@@ -40,6 +41,8 @@ class psro_rarl:
             np.array([], dtype=np.float32),
         ]
 
+        setup_seed(args.seed)
+
     def get_env(self):
         import gym
 
@@ -48,6 +51,10 @@ class psro_rarl:
         # env = HopperTorso6Env()
         env = Walker2dTorsoEnv()
         # env = Walker2dEnv()
+        seed = self.args.seed
+        env.seed(seed=seed)
+        env.pro_action_space.seed(seed=seed)
+        env.adv_action_space.seed(seed=seed)
         return env
 
     def get_agent(self, agent_idx):
@@ -194,13 +201,31 @@ class psro_rarl:
             print(self.meta_strategies)
 
     def eval(self):
-        print()
+        adversary = self.get_agent(agent_idx=1)
+        max_steps = self.train_max_episode * self.args.max_ep_len
+        while True:
+            pro_idx = np.random.choice(
+                range(len(self.pro_list)), p=self.meta_strategies[0]
+            )
+            pro = self.pro_list[pro_idx]
+            adversary.train(o_agent=pro)
+            if adversary.current_step > max_steps:
+                break
+        reward_list = []
+        for pro in self.pro_list:
+            reward = pro.eval(o_agent=adversary, episode_per_eval=self.args.eval_max_episode)
+            reward_list.append(reward)
+
+        mean_reward = 0.0
+        for i, val in enumerate(reward_list):
+            mean_reward += self.meta_strategies[0][i] * val
+        return reward_list, mean_reward
 
 
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     parser = argparse.ArgumentParser()
-
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--max_loop", type=int, default=4)
     parser.add_argument(
         "--solution", type=str, default="the solution for the meta game"

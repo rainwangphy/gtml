@@ -24,11 +24,12 @@ def setup_seed(seed=42):
 
 
 setup_seed(seed=seed)
+env.seed(seed=seed)
 env.pro_action_space.seed(seed=seed)
 env.adv_action_space.seed(seed=seed)
 
 for _ in range(1):
-    env.reset(seed=seed)
+    env.reset()
     done = False
     while not done:
         action = env.sample_action()
