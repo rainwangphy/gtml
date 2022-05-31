@@ -90,48 +90,87 @@ class do_at:
 
     def get_dataset(self):
         input_size = 32
-        dataroot = "./data/cifar10"
-        train_loader = torch.utils.data.DataLoader(
-            datasets.CIFAR10(
-                root=dataroot,
-                train=True,
-                download=True,
-                transform=transforms.Compose(
-                    [
-                        transforms.Resize((input_size, input_size)),
-                        transforms.ToTensor(),
-                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                    ]
+        if self.args.dataset == "cifar10":
+            dataroot = "./data/cifar10"
+            train_loader = torch.utils.data.DataLoader(
+                datasets.CIFAR10(
+                    root=dataroot,
+                    train=True,
+                    download=True,
+                    transform=transforms.Compose(
+                        [
+                            transforms.Resize((input_size, input_size)),
+                            transforms.ToTensor(),
+                            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                        ]
+                    ),
                 ),
-            ),
-            batch_size=256,
-            shuffle=True,
-            num_workers=4,
-            drop_last=True,
-        )
-        test_loader = torch.utils.data.DataLoader(
-            datasets.CIFAR10(
-                root=dataroot,
-                train=False,
-                download=True,
-                transform=transforms.Compose(
-                    [
-                        transforms.Resize((input_size, input_size)),
-                        transforms.ToTensor(),
-                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                    ]
+                batch_size=256,
+                shuffle=True,
+                num_workers=4,
+                drop_last=True,
+            )
+            test_loader = torch.utils.data.DataLoader(
+                datasets.CIFAR10(
+                    root=dataroot,
+                    train=False,
+                    download=True,
+                    transform=transforms.Compose(
+                        [
+                            transforms.Resize((input_size, input_size)),
+                            transforms.ToTensor(),
+                            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                        ]
+                    ),
                 ),
-            ),
-            batch_size=256,
-            shuffle=True,
-            num_workers=4,
-            drop_last=True,
-        )
+                batch_size=256,
+                shuffle=True,
+                num_workers=4,
+                drop_last=True,
+            )
+        else:
+            dataroot = "./data/cifar100"
+            train_loader = torch.utils.data.DataLoader(
+                datasets.CIFAR100(
+                    root=dataroot,
+                    train=True,
+                    download=True,
+                    transform=transforms.Compose(
+                        [
+                            transforms.Resize((input_size, input_size)),
+                            transforms.ToTensor(),
+                            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                        ]
+                    ),
+                ),
+                batch_size=256,
+                shuffle=True,
+                num_workers=4,
+                drop_last=True,
+            )
+            test_loader = torch.utils.data.DataLoader(
+                datasets.CIFAR100(
+                    root=dataroot,
+                    train=False,
+                    download=True,
+                    transform=transforms.Compose(
+                        [
+                            transforms.Resize((input_size, input_size)),
+                            transforms.ToTensor(),
+                            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                        ]
+                    ),
+                ),
+                batch_size=256,
+                shuffle=True,
+                num_workers=4,
+                drop_last=True,
+            )
         return train_loader, test_loader
 
     def at_init(self, do_predict):
         # print()
-        load = True
+        load = False
         if load:
             # print()
             classifier = torch.load(
