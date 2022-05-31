@@ -1,5 +1,7 @@
 import os
+import sys
 
+sys.path.append("../")
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import argparse
@@ -8,11 +10,23 @@ import torch.utils.data
 import tqdm
 import os
 import torch
-from gan.gan_impl import wgan as gan_gen
+from gan.gan_impl import wgan
 
 from torchvision import datasets, transforms
 from meta_solvers.prd_solver import projected_replicator_dynamics
 from torch.utils.data import DataLoader
+
+
+def setup_seed(seed=42):
+    import numpy as np
+    import torch
+    import random
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
 
 
 def soft_update(online, target, tau=0.9):
@@ -47,11 +61,11 @@ class do_gan:
 
     def get_generator(self):
         args = self.args
-        return gan_gen.wgan_generator(args)
+        return wgan.wgan_generator(args)
 
     def get_discriminator(self):
         args = self.args
-        return gan_gen.wgan_discriminator(args)
+        return wgan.wgan_discriminator(args)
 
     def get_dataset(self):
         #########################
@@ -304,7 +318,15 @@ class do_gan:
                         meta_games[1][t_r][t_c] = -dis_loss
 
             self.meta_games = meta_games
-            self.meta_strategies = projected_replicator_dynamics(self.meta_games)
+            if self.args.solution == "nash":
+                self.meta_strategies = projected_replicator_dynamics(self.meta_games)
+            else:
+                self.meta_strategies = [
+                    np.array([1.0 for _ in range(len(self.generator_list))])
+                    / len(self.generator_list),
+                    np.array([1.0 for _ in range(len(self.discriminator_list))])
+                    / len(self.discriminator_list),
+                ]
             print(self.meta_games)
             print(self.meta_strategies)
             # self.eval_one_generator(idx=-1)
@@ -338,10 +360,9 @@ if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     parser = argparse.ArgumentParser()
 
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--max_loop", type=int, default=10)
-    parser.add_argument(
-        "--solution", type=str, default="the solution for the meta game"
-    )
+    parser.add_argument("--solution", type=str, default="nash")
     parser.add_argument("--train_max_epoch", type=int, default=100)
     parser.add_argument("--eval_max_epoch", type=int, default=20)
     parser.add_argument("--device", type=str, default="cuda")
@@ -353,7 +374,7 @@ if __name__ == "__main__":
         "--batch_size", type=int, default=64, help="size of the batches"
     )
     parser.add_argument(
-        "--lambda_gp", type=float, default=10.0, help="gradient penalty for WGAN"
+        "--lambda_gp", type=float, default=0, help="gradient penalty for WGAN"
     )
     parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
     parser.add_argument(
@@ -386,7 +407,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_critic",
         type=int,
-        default=5,
+        default=3,
         help="number of training steps for discriminator per iter",
     )
     parser.add_argument(
@@ -400,6 +421,7 @@ if __name__ == "__main__":
     )
     opt = parser.parse_args()
     args = parser.parse_args()
+    setup_seed(args.seed)
     # print()
     do_time_gan = do_gan(args)
     do_time_gan.init()

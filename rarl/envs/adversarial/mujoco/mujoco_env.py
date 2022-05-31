@@ -57,9 +57,7 @@ class MujocoEnv(gym.Env):
             except ImportError as e:
                 raise error.DependencyNotInstalled(
                     "{}. (HINT: you need to install mujoco_py, and also perform the setup instructions here: "
-                    "https://github.com/openai/mujoco-py/.)".format(
-                        e
-                    )
+                    "https://github.com/openai/mujoco-py/.)".format(e)
                 )
 
             self.model = self._mujoco_bindings.load_model_from_path(fullpath)

@@ -1,11 +1,32 @@
+import sys
+
+sys.path.append("../")
+
 from rarl.agent import Agent
 from rarl.envs.adversarial.mujoco.hopper_torso_6 import HopperTorso6Env
+
 # from rarl.envs.adversarial.mujoco.walker2d import Walker2dEnv
+from rarl.envs.adversarial.mujoco.hopper_heel import HopperHeelEnv
 from rarl.envs.adversarial.mujoco.walker2d_torso import Walker2dTorsoEnv
+from rarl.envs.adversarial.mujoco.walker2d_heel import Walker2dHeelEnv
 import numpy as np
 from meta_solvers.prd_solver import projected_replicator_dynamics
 import argparse
-from rarl.utils import setup_seed
+import torch
+
+# from rarl.utils import setup_seed
+
+
+def setup_seed(seed=42):
+    import numpy as np
+    import torch
+    import random
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
 
 
 def soft_update(online, target, tau=0.9):
@@ -42,14 +63,25 @@ class psro_rarl:
         ]
 
         setup_seed(args.seed)
+        self.result_dir = "./results/"
+        self.result_dict = {}
 
     def get_env(self):
         import gym
 
         gym.logger.set_level(40)
         # env_name = self.args.env_name
+        env_name = self.args.env
+        if env_name == "walker_heel":
+            env = Walker2dHeelEnv()
+        elif env_name == "walker_torso":
+            env = Walker2dTorsoEnv()
+        elif env_name == "hopper_torso":
+            env = HopperTorso6Env()
+        else:
+            env = HopperHeelEnv()
         # env = HopperTorso6Env()
-        env = Walker2dTorsoEnv()
+        # env = Walker2dTorsoEnv()
         # env = Walker2dEnv()
         seed = self.args.seed
         env.seed(seed=seed)
@@ -196,45 +228,67 @@ class psro_rarl:
                         meta_games[1][t_r][t_c] = -reward
 
             self.meta_games = meta_games
-            self.meta_strategies = projected_replicator_dynamics(self.meta_games)
+            if self.args.solution == "nash":
+                self.meta_strategies = projected_replicator_dynamics(self.meta_games)
+            else:
+                self.meta_strategies = [
+                    np.array([1.0 for _ in range(len(self.pro_list))])
+                    / len(self.pro_list),
+                    np.array([1.0 for _ in range(len(self.adv_list))])
+                    / len(self.adv_list),
+                ]
             print(self.meta_games)
             print(self.meta_strategies)
 
-    def eval(self):
-        adversary = self.get_agent(agent_idx=1)
-        max_steps = self.train_max_episode * self.args.max_ep_len
-        while True:
-            pro_idx = np.random.choice(
-                range(len(self.pro_list)), p=self.meta_strategies[0]
-            )
-            pro = self.pro_list[pro_idx]
-            adversary.train(o_agent=pro)
-            if adversary.current_step > max_steps:
-                break
-        reward_list = []
-        for pro in self.pro_list:
-            reward = pro.eval(o_agent=adversary, episode_per_eval=self.args.eval_max_episode)
-            reward_list.append(reward)
+            results = {
+                "meta_games": self.meta_games,
+                "meta_strategies": self.meta_strategies,
+            }
 
-        mean_reward = 0.0
-        for i, val in enumerate(reward_list):
-            mean_reward += self.meta_strategies[0][i] * val
-        return reward_list, mean_reward
+            self.result_dict[loop] = results
+            torch.save(
+                self.result_dict,
+                "seed_{}_env_{}_solution_{}".format(
+                    self.args.seed, self.args.env, self.args.solution
+                ),
+            )
+
+    # def eval(self):
+    #     adversary = self.get_agent(agent_idx=1)
+    #     max_steps = self.train_max_episode * self.args.max_ep_len
+    #     while True:
+    #         pro_idx = np.random.choice(
+    #             range(len(self.pro_list)), p=self.meta_strategies[0]
+    #         )
+    #         pro = self.pro_list[pro_idx]
+    #         adversary.train(o_agent=pro)
+    #         if adversary.current_step > max_steps:
+    #             break
+    #     reward_list = []
+    #     for pro in self.pro_list:
+    #         reward = pro.eval(o_agent=adversary, episode_per_eval=self.args.eval_max_episode)
+    #         reward_list.append(reward)
+    #
+    #     mean_reward = 0.0
+    #     for i, val in enumerate(reward_list):
+    #         mean_reward += self.meta_strategies[0][i] * val
+    #     return reward_list, mean_reward
 
 
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--env", type=str, default="walker_heel")
     parser.add_argument("--max_loop", type=int, default=4)
-    parser.add_argument(
-        "--solution", type=str, default="the solution for the meta game"
-    )
+    parser.add_argument("--solution", type=str, default="nash")
+
     parser.add_argument("--train_max_episode", type=int, default=500)
     parser.add_argument("--rarl_init_max_episode", type=int, default=1000)
     parser.add_argument("--eval_max_episode", type=int, default=100)
 
     parser.add_argument("--max_ep_len", type=int, default=1000)
+
     args = parser.parse_args()
     psro_rarl_agent = psro_rarl(args=args)
 

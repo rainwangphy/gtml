@@ -1,5 +1,7 @@
 import os
+import sys
 
+sys.path.append("../")
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import argparse
@@ -20,11 +22,24 @@ import torch
 # from models.wrn import Wide_ResNet
 from torchvision import datasets, transforms
 from meta_solvers.prd_solver import projected_replicator_dynamics
+
 from cv.classifiers import do_classifier
 from cv.attacks.pgd_attack import pgd_attacker
 import torch.optim as optim
 from torch.optim import lr_scheduler
 from adv.cv.attacks.pgd_attack import LinfPGDAttack
+
+
+def setup_seed(seed=42):
+    import numpy as np
+    import torch
+    import random
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
 
 
 class do_at:
@@ -36,6 +51,7 @@ class do_at:
         self.eval_max_epoch = args.eval_max_epoch
         self.device = args.device
         self.train_data_loader = None
+        self.test_data_loader = None
 
         self.pretrain_dir = "./pretrained_models/"
 
@@ -53,15 +69,20 @@ class do_at:
             np.array([], dtype=np.float32),
         ]
 
+        self.result_dict = {}
+        self.result_dir = "./results/"
+
     def get_classifier(self):
         # device = self.device
         return do_classifier(args=self.args)
 
-    def get_attacker(self):
+    def get_attacker(self, is_train=True):
         config = {
             "predict": self.classifier_list,
             "predict_dis": self.meta_strategies[0],
-            "clean_train_dataloader": self.train_data_loader,
+            "clean_train_dataloader": self.train_data_loader
+            if is_train
+            else self.test_data_loader,
             "device": self.device,
             "nb_iter": self.args.nb_iter,
         }
@@ -88,13 +109,31 @@ class do_at:
             num_workers=4,
             drop_last=True,
         )
-        return train_loader
+        test_loader = torch.utils.data.DataLoader(
+            datasets.CIFAR10(
+                root=dataroot,
+                train=False,
+                download=True,
+                transform=transforms.Compose(
+                    [
+                        transforms.Resize((input_size, input_size)),
+                        transforms.ToTensor(),
+                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                    ]
+                ),
+            ),
+            batch_size=256,
+            shuffle=True,
+            num_workers=4,
+            drop_last=True,
+        )
+        return train_loader, test_loader
 
     def at_init(self, do_predict):
         # print()
         load = True
         if load:
-            print()
+            # print()
             classifier = torch.load(
                 self.pretrain_dir + "pgd_classifier_{}.pth".format(self.args.nb_iter)
             )
@@ -142,7 +181,7 @@ class do_at:
 
     def init(self):
         # print("init")
-        self.train_data_loader = self.get_dataset()
+        self.train_data_loader, self.test_data_loader = self.get_dataset()
         classifier = self.get_classifier()
         if args.at_init:
             self.at_init(classifier)
@@ -168,7 +207,7 @@ class do_at:
         for i, (imgs, labels) in enumerate(attacker.perturbed_train_dataloader):
             accuracy += classifier.eval(imgs, labels)
         accuracy /= len(self.train_data_loader)
-        print(accuracy)
+        # print(accuracy)
 
         self.classifier_list.append(classifier)
         self.attacker_list.append(attacker)
@@ -181,13 +220,14 @@ class do_at:
         self.meta_strategies = [np.array([1.0]), np.array([1.0])]
         print(self.meta_games)
         print(self.meta_strategies)
+        self.eval_on_test(loop=0)
 
     def solve(self):
         for loop in range(self.max_loop):
             classifier = self.get_classifier()
             print("get attacker")
             attacker = self.get_attacker()
-            self.eval(eval_attacker=attacker)
+            # self.eval(eval_attacker=attacker)
             print("train classifier")
             for _ in range(min(self.train_max_epoch * (loop + 1), 150)):
                 for i in range(len(self.train_data_loader)):
@@ -250,37 +290,64 @@ class do_at:
                         meta_games[1][t_r][t_c] = -accuracy
 
             self.meta_games = meta_games
-            self.meta_strategies = projected_replicator_dynamics(self.meta_games)
-            print(self.meta_games)
-            print(self.meta_strategies)
+            if self.args.solution == "nash":
+                self.meta_strategies = projected_replicator_dynamics(self.meta_games)
+            else:
+                self.meta_strategies = [
+                    np.array([1.0 for _ in range(len(self.classifier_list))])
+                    / len(self.classifier_list),
+                    np.array([1.0 for _ in range(len(self.attacker_list))])
+                    / len(self.attacker_list),
+                ]
+            # self.meta_strategies = projected_replicator_dynamics(self.meta_games)
+            # print(self.meta_games)
+            # print(self.meta_strategies)
+            self.eval_on_test(loop + 1)
 
-    def final_eval(self):
-        eval_attacker = self.get_attacker()
-        self.eval(eval_attacker)
+    def eval_on_test(self, loop):
+        # print(self.test_data_loader)
+        eval_attacker = self.get_attacker(is_train=False)
+        final_accuracy, accuracy_list = self.eval(eval_attacker)
+        results = {
+            "meta_game": self.meta_games,
+            "meta_strategies": self.meta_strategies,
+            "final_accuracy": final_accuracy,
+            "accuracy_list": accuracy_list,
+        }
+        self.result_dict[loop] = results
+        torch.save(
+            self.result_dict,
+            self.result_dir
+            + "seed_{}_dataset_{}_solution_{}_nb_iter_{}.pth".format(
+                self.args.seed, self.args.dataset, self.args.solution, self.args.nb_iter
+            ),
+        )
 
     def eval(self, eval_attacker):
         accuracy_list = []
         for classifier in self.classifier_list:
             accuracy = 0.0
-            for i in range(len(self.train_data_loader)):
+            for i in range(len(self.test_data_loader)):
                 (imgs, labels) = eval_attacker.perturbed_train_dataloader[i]
                 accuracy += classifier.eval(imgs, labels)
-            accuracy /= len(self.train_data_loader)
+            accuracy /= len(self.test_data_loader)
             accuracy_list.append(accuracy)
         final_accuracy = 0
         for i in range(len(self.classifier_list)):
             final_accuracy += accuracy_list[i] * self.meta_strategies[0][i]
         print("current final accuracy: {}".format(final_accuracy))
+        return final_accuracy, accuracy_list
 
 
 if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     parser = argparse.ArgumentParser()
 
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--dataset", type=str, default="cifar10")
+
     parser.add_argument("--max_loop", type=int, default=5)
-    parser.add_argument(
-        "--solution", type=str, default="the solution for the meta game"
-    )
+    parser.add_argument("--solution", type=str, default="nash")
     parser.add_argument("--train_max_epoch", type=int, default=50)
     parser.add_argument("--eval_max_epoch", type=int, default=2)
     parser.add_argument("--device", type=str, default="cuda")
@@ -294,9 +361,11 @@ if __name__ == "__main__":
     parser.add_argument("--milestones", default=[60, 120, 160])
     parser.add_argument("--gamma", type=float, default=0.2)
     args = parser.parse_args()
+
+    setup_seed(args.seed)
     # print()
     do_at_pgd = do_at(args)
     do_at_pgd.init()
     do_at_pgd.solve()
     # do_at_pgd.eval()
-    do_at_pgd.final_eval()
+    # do_at_pgd.final_eval()
