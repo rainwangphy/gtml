@@ -6,6 +6,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import argparse
 import numpy as np
+import os.path as osp
 
 # import torch
 import torch.utils.data
@@ -70,7 +71,7 @@ class do_at:
         ]
 
         self.result_dict = {}
-        self.result_dir = "./results/"
+        self.result_dir = "./results"
 
     def get_classifier(self):
         # device = self.device
@@ -259,7 +260,7 @@ class do_at:
         self.meta_strategies = [np.array([1.0]), np.array([1.0])]
         print(self.meta_games)
         print(self.meta_strategies)
-        self.eval_on_test(loop=0)
+        self.eval_on_test()
 
     def solve(self):
         for loop in range(self.max_loop):
@@ -341,9 +342,10 @@ class do_at:
             # self.meta_strategies = projected_replicator_dynamics(self.meta_games)
             # print(self.meta_games)
             # print(self.meta_strategies)
-            self.eval_on_test(loop + 1)
+            self.eval_on_test()
 
-    def eval_on_test(self, loop):
+    def eval_on_test(self):
+        loop = len(self.classifier_list)
         # print(self.test_data_loader)
         eval_attacker = self.get_attacker(is_train=False)
         final_accuracy, accuracy_list = self.eval(eval_attacker)
@@ -356,9 +358,32 @@ class do_at:
         self.result_dict[loop] = results
         torch.save(
             self.result_dict,
-            self.result_dir
-            + "seed_{}_dataset_{}_solution_{}_nb_iter_{}.pth".format(
-                self.args.seed, self.args.dataset, self.args.solution, self.args.nb_iter
+            osp.join(
+                self.result_dir,
+                "seed_{}_dataset_{}_solution_{}_nb_iter_{}.pth".format(
+                    self.args.seed,
+                    self.args.dataset,
+                    self.args.solution,
+                    self.args.nb_iter,
+                ),
+            ),
+        )
+        models = {
+            "classfier_list": self.classifier_list[-1],
+            "adversary_list": self.attacker_list[-1],
+        }
+
+        torch.save(
+            models,
+            osp.join(
+                self.result_dir,
+                "seed_{}_dataset_{}_solution_{}_nb_iter_{}_models_{}.pth".format(
+                    self.args.seed,
+                    self.args.dataset,
+                    self.args.solution,
+                    self.args.nb_iter,
+                    loop,
+                ),
             ),
         )
 

@@ -13,6 +13,8 @@ import numpy as np
 from meta_solvers.prd_solver import projected_replicator_dynamics
 import argparse
 import torch
+import os.path as osp
+
 
 # from rarl.utils import setup_seed
 
@@ -63,7 +65,7 @@ class psro_rarl:
         ]
 
         setup_seed(args.seed)
-        self.result_dir = "./results/"
+        self.result_dir = "./results"
         self.result_dict = {}
 
     def get_env(self):
@@ -243,13 +245,18 @@ class psro_rarl:
             results = {
                 "meta_games": self.meta_games,
                 "meta_strategies": self.meta_strategies,
+                "pro_list": self.pro_list,
+                "adv_list": self.adv_list,
             }
 
             self.result_dict[loop] = results
             torch.save(
                 self.result_dict,
-                "seed_{}_env_{}_solution_{}".format(
-                    self.args.seed, self.args.env, self.args.solution
+                osp.join(
+                    self.result_dir,
+                    "seed_{}_env_{}_solution_{}".format(
+                        self.args.seed, self.args.env, self.args.solution
+                    ),
                 ),
             )
 
@@ -279,7 +286,7 @@ if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--env", type=str, default="walker_heel")
+    parser.add_argument("--env", type=str, default="hopper_heel")
     parser.add_argument("--max_loop", type=int, default=4)
     parser.add_argument("--solution", type=str, default="nash")
 

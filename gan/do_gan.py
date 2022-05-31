@@ -4,11 +4,13 @@ import sys
 sys.path.append("../")
 os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
+import os.path as osp
 import argparse
 import numpy as np
 import torch.utils.data
 import tqdm
-import os
+
+# import os
 import torch
 from gan.gan_impl import wgan, v_gan
 
@@ -58,6 +60,9 @@ class do_gan:
             np.array([], dtype=np.float32),
             np.array([], dtype=np.float32),
         ]
+
+        self.result_dir = "./results"
+        self.result_dict = {}
 
     def get_generator(self):
         args = self.args
@@ -272,7 +277,8 @@ class do_gan:
         self.meta_strategies = [np.array([1.0]), np.array([1.0])]
         print(self.meta_games)
         print(self.meta_strategies)
-        self.eval_one_generator(idx=-1)
+        # self.eval_one_generator(idx=-1)
+        self.eval_generator_list()
 
     def solve(self):
         dataloader = self.data
@@ -390,6 +396,31 @@ class do_gan:
             generator_distribution=self.meta_strategies[0],
         )
         print(dict_score)
+        loop = len(self.generator_list)
+        self.result_dict[loop] = {"score": dict_score}
+        torch.save(
+            self.result_dict,
+            osp.join(
+                self.result_dir,
+                "seed_{}_dataset_{}_solution_{}".format(
+                    self.args.seed, self.args.dataset, self.args.solution
+                ),
+            ),
+        )
+
+        models = {
+            "generator": self.generator_list[-1],
+            "discriminator": self.discriminator_list[-1],
+        }
+        torch.save(
+            self.result_dict,
+            osp.join(
+                self.result_dir,
+                "seed_{}_dataset_{}_solution_{}_model_{}".format(
+                    self.args.seed, self.args.dataset, self.args.solution, loop
+                ),
+            ),
+        )
 
 
 if __name__ == "__main__":
