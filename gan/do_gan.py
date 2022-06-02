@@ -2,7 +2,7 @@ import os
 import sys
 
 sys.path.append("../")
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import os.path as osp
 import argparse
@@ -298,11 +298,11 @@ class do_gan:
                     target=discriminator.discriminator,
                 )
 
-            logger = tqdm.trange(
-                int(self.args.train_max_epoch * (loop + 1)),
-                desc=f"train the generator {loop}",
-            )
-            for epoch in logger:
+            # logger = tqdm.trange(
+            #     int(self.args.train_max_epoch * (loop + 1)),
+            #     desc=f"train the generator {loop}",
+            # )
+            for epoch in range(int(self.args.train_max_epoch * (loop + 1))):
                 for i, (imgs, _) in enumerate(dataloader):
                     dis_idx = np.random.choice(
                         range(len(self.discriminator_list)), p=self.meta_strategies[1]
@@ -310,11 +310,11 @@ class do_gan:
                     # data = {"X": X_mb, "T": T_mb}
                     data = {"real_imgs": imgs}
                     generator.train(data, self.discriminator_list[dis_idx])
-            logger = tqdm.trange(
-                int(self.args.n_critic * self.args.train_max_epoch * (loop + 1)),
-                desc=f"train the discriminator {loop}",
-            )
-            for epoch in logger:
+            # logger = tqdm.trange(
+            #     int(self.args.n_critic * self.args.train_max_epoch * (loop + 1)),
+            #     desc=f"train the discriminator {loop}",
+            # )
+            for epoch in range(int(self.args.n_critic * self.args.train_max_epoch * (loop + 1))):
                 for i, (imgs, _) in enumerate(dataloader):
                     gen_idx = np.random.choice(
                         range(len(self.generator_list)), p=self.meta_strategies[0]
@@ -428,14 +428,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--max_loop", type=int, default=10)
+    parser.add_argument("--max_loop", type=int, default=5)
     parser.add_argument("--solution", type=str, default="nash")
     parser.add_argument("--train_max_epoch", type=int, default=100)
     parser.add_argument("--eval_max_epoch", type=int, default=20)
     parser.add_argument("--device", type=str, default="cuda")
 
     parser.add_argument("--gan_name", type=str, default="gan")
-    parser.add_argument("--dataset", type=str, default="cifar10")
+    parser.add_argument("--dataset", type=str, default="stl")
     parser.add_argument(
         "--n_epochs", type=int, default=200, help="number of epochs of training"
     )

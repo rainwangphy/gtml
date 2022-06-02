@@ -2,7 +2,7 @@ import os
 import sys
 
 sys.path.append("../")
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import argparse
 import numpy as np
@@ -146,7 +146,7 @@ class do_at:
                 ),
                 batch_size=256,
                 shuffle=True,
-                num_workers=4,
+                num_workers=2,
                 drop_last=True,
             )
             test_loader = torch.utils.data.DataLoader(
@@ -164,7 +164,7 @@ class do_at:
                 ),
                 batch_size=256,
                 shuffle=True,
-                num_workers=4,
+                num_workers=2,
                 drop_last=True,
             )
         return train_loader, test_loader
@@ -203,7 +203,7 @@ class do_at:
             max_epochs = args.at_init_max_epochs
             for _ in range(max_epochs):
                 for i, (imgs, labels) in enumerate(self.train_data_loader):
-                    print(i)
+                    # print(i)
                     imgs = imgs.to(device)
                     labels = labels.to(device)
                     perturbed_x = attack.perturb(imgs, labels)

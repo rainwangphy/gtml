@@ -8,7 +8,12 @@ class do_classifier:
     def __init__(self, args):
         self.args = args
         self.device = args.device
-        self.classifier = Wide_ResNet(16, 10, 0.3, 10).to(self.device)
+        # num_class = 0
+        if self.args.dataset == 'cifar10':
+            num_class = 10
+        else:
+            num_class = 100
+        self.classifier = Wide_ResNet(16, 10, 0.3, num_class).to(self.device)
         self.loss_fn = nn.CrossEntropyLoss()
 
         self.optimizer = optim.SGD(

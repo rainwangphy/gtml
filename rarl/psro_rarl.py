@@ -287,7 +287,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--env", type=str, default="hopper_heel")
-    parser.add_argument("--max_loop", type=int, default=4)
+    parser.add_argument("--max_loop", type=int, default=5)
     parser.add_argument("--solution", type=str, default="nash")
 
     parser.add_argument("--train_max_episode", type=int, default=500)
