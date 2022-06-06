@@ -1,12 +1,12 @@
 # parser.add_argument("--gan_name", type=str, default="gan")
 # parser.add_argument("--dataset", type=str, default="cifar10")
 
-gan_name_list = ["gan", "wgan"]
+gan_name_list = ["gan", "wgan", "wgan_gp"]
 solution_list = ["nash", "uniform"]
 dataset_list = ["cifar10", "stl10"]
 
 
-cuda_devices_list = [2, 3]
+cuda_devices_list = [1, 2, 3]
 
 cuda_str = "CUDA_VISIBLE_DEVICES"
 filename = "run_exp.sh"

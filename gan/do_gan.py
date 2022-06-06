@@ -66,14 +66,14 @@ class do_gan:
 
     def get_generator(self):
         args = self.args
-        if args.gan_name == "wgan":
+        if args.gan_name == "wgan" or args.gan_name == 'wgan_gp':
             return wgan.wgan_generator(args)
         else:
             return v_gan.gan_generator(args)
 
     def get_discriminator(self):
         args = self.args
-        if args.gan_name == "wgan":
+        if args.gan_name == "wgan" or args.gan_name == 'wgan_gp':
             return wgan.wgan_discriminator(args)
         else:
             return v_gan.gan_discriminator(args)
@@ -178,8 +178,8 @@ class do_gan:
                     do_discriminator.train(data, do_generator, True)
                     if i % opt.n_critic == 0:
                         do_generator.train(data, do_discriminator, True)
-            torch.save(do_generator.generator, "wgan_generator.pth")
-            torch.save(do_discriminator.discriminator, "wgan_discriminator.pth")
+            # torch.save(do_generator.generator, "wgan_generator.pth")
+            # torch.save(do_discriminator.discriminator, "wgan_discriminator.pth")
             # # Configure input
             # # real_imgs = Variable(imgs.type(Tensor))
             # # Sample noise as generator input
@@ -402,8 +402,8 @@ class do_gan:
             self.result_dict,
             osp.join(
                 self.result_dir,
-                "seed_{}_dataset_{}_solution_{}".format(
-                    self.args.seed, self.args.dataset, self.args.solution
+                "seed_{}_gan_name_{}_dataset_{}_solution_{}".format(
+                    self.args.seed, self.args.gan_name, self.args.dataset, self.args.solution
                 ),
             ),
         )
@@ -416,8 +416,8 @@ class do_gan:
             self.result_dict,
             osp.join(
                 self.result_dir,
-                "seed_{}_dataset_{}_solution_{}_model_{}".format(
-                    self.args.seed, self.args.dataset, self.args.solution, loop
+                "seed_{}_gan_name_{}_dataset_{}_solution_{}_model_{}".format(
+                    self.args.seed, self.args.gan_name, self.args.dataset, self.args.solution, loop
                 ),
             ),
         )
@@ -490,6 +490,9 @@ if __name__ == "__main__":
     )
     opt = parser.parse_args()
     args = parser.parse_args()
+
+    if args.gan_name == 'wgan_gp':
+        args.lambda_gp = 10.0
     setup_seed(args.seed)
     # print()
     do_time_gan = do_gan(args)
