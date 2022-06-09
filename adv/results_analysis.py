@@ -54,7 +54,12 @@ for nb_iter in nb_iter_list:
             print(acc_list)
             mean = np.array(acc_list)
             x = np.array([i+1 for i in range(len(mean))])
-            plt.plot(x, mean, 'o-', label=solution)
+            if solution == 'nash':
+                plt.plot(x, mean, 'o-', label='Nash')
+                # plt.errorbar(x, mean, yerr=std, fmt="o-", label='Nash', capsize=4)
+            else:
+                plt.plot(x, mean, 'o-', label='Uniform')
+
         plt.legend()
         plt.savefig(
             osp.join(figure_dir, "{}_{}.pdf".format(dataset, nb_iter)), bbox_inches="tight", pad_inches=0.0

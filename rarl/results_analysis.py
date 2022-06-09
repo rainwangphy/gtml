@@ -59,7 +59,10 @@ for env in env_list:
         # for solution in solution_list:
         mean = solution_results[solution]["mean"]
         std = solution_results[solution]["std"]
-        plt.errorbar(x, mean, yerr=std, fmt="o-", label=solution)
+        if solution == 'nash':
+            plt.errorbar(x, mean, yerr=std, fmt="o-", label='Nash', capsize=4)
+        else:
+            plt.errorbar(x, mean, yerr=std, fmt="o-", label='Uniform', capsize=4)
         # plt.fill_between(
         #     x,
         #     mean + std,

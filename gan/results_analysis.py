@@ -59,7 +59,10 @@ for gan_name in gan_name_list:
         for solution in solution_list:
             mean = np.array(res_dict[solution]["score"])
             std = np.array(res_dict[solution]["var"])
-            plt.errorbar(x, mean, yerr=std, fmt="o-", label=solution)
+            if solution == 'nash':
+                plt.errorbar(x, mean, yerr=std, fmt="o-", label='Nash', capsize=4)
+            else:
+                plt.errorbar(x, mean, yerr=std, fmt="o-", label='Uniform', capsize=4)
             # plt.fill_between(
             #     x,
             #     mean + std,
