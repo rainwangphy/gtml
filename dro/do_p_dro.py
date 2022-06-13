@@ -55,7 +55,7 @@ class do_p_dro:
                         "adv_task": None,
                         "adv_architecture": "small_transformer_generative",
                         "adv_filename": "pretrained_models"
-                        "/biased_SST_95_gen_LM_small_transformer_generative_wikitext103_model.pt",
+                                        "/biased_SST_95_gen_LM_small_transformer_generative_wikitext103_model.pt",
                         "input_shape": None,
                         "adv_output_size": None,
                         "ratio_model": False,
@@ -193,8 +193,8 @@ class do_p_dro:
         # Add the baseline log p as an attribute to the train data
         # First initialize attributes (FIXME: this should be removed)
         if (
-            not hasattr(task.train_data, "attributes")
-            or task.train_data.attributes is None
+                not hasattr(task.train_data, "attributes")
+                or task.train_data.attributes is None
         ):
             task.train_data.attributes = [{} for _ in range(len(task.train_data))]
         # Sanity check
@@ -212,10 +212,19 @@ class do_p_dro:
         return p_dro_adversary(config)
 
     def init(self):
-        # print()
         model = self.get_model()
         adversary = self.get_adversary()
-        # print(len(self.loader))
+
+        best_model_state_dict = torch.load('biased_sst_p_dro_run_0_robust_model.pt')
+        model.model.load_state_dict(best_model_state_dict)
+        best_adv_state_dict = torch.load('biased_sst_p_dro_run_0_robust_lm.pt')
+        adversary.adversary.load_state_dict(best_adv_state_dict)
+
+        model_file = os.path.join("results", 'init' + '_model.pt')
+        lm_file = os.path.join("results", 'init' + '_lm.pt')
+        torch.save(model.model.state_dict(), model_file)
+        torch.save(adversary.adversary.state_dict(), lm_file)
+
         sum_loss = 0.0
         for i, data in enumerate(self.loader):
             # print("{}-{}".format(i, len(self.loader)))
@@ -236,14 +245,59 @@ class do_p_dro:
         print(self.meta_strategies)
 
     def solve(self):
+        def parse_domain(domain_descriptor):
+            domain_attributes = {}
+            if len(domain_descriptor) == 0:
+                return lambda x: True
+            for k_v in domain_descriptor.split(","):
+                k, v = k_v.split("=")
+                domain_attributes[k] = v
+
+            def filtering(attr):
+                for k, v in domain_attributes.items():
+                    if k not in attr or str(attr[k]) != v:
+                        return False
+
+                return True
+
+            return filtering
+
+        eval_on_domains = ['biased=True,label=0', 'biased=True,label=1', 'biased=False,label=0', 'biased=False,label=1']
+        eval_domain_filters = {domain: parse_domain(domain) for domain in eval_on_domains}
+        group_idxs = {domain: [idx for idx, x in enumerate(self.task.test_data.attributes) if domain_filter(x)] for
+                      domain, domain_filter in eval_domain_filters.items()}
+
+        average_ss = []
+        robust_ss = []
+
         for loop in range(self.max_loop):
             # classifier = self.get_classifier()
-            print("get attacker")
+            print(str(loop), "get attacker")
             # attacker = self.get_attacker()
             print("train classifier")
             model = self.get_model()
             adversary = self.get_adversary()
-            for _ in range(self.train_max_epoch):
+
+            best_model_state_dict = torch.load('biased_sst_p_dro_run_0_robust_model.pt')
+            model.model.load_state_dict(best_model_state_dict)
+            best_adv_state_dict = torch.load('biased_sst_p_dro_run_0_robust_lm.pt')
+            adversary.adversary.load_state_dict(best_adv_state_dict)
+            if loop == 0:
+                (test_examples_scores, test_losses) = self.task.eval_model(self.model_list[0].model, data='test',
+                                                                           by_example=True, nll=True)
+                test_examples_scores = test_examples_scores.numpy()
+                average_ss.append(test_examples_scores.mean())
+                print(loop, 'Before train Avg score: ', test_examples_scores.mean())
+                group_scores = np.asarray([test_examples_scores[g_idxs].mean() for g_idxs in group_idxs.values()])
+                lower_is_better = False
+                if lower_is_better:
+                    current_robust_score = group_scores.max()
+                else:
+                    current_robust_score = group_scores.min()
+                print(loop, 'Before train Robust score: ', current_robust_score)
+                robust_ss.append(current_robust_score)
+
+            for _ in range(int(self.train_max_epoch * (loop + 1))):
                 for i, data in enumerate(self.loader):
                     adv_idx = np.random.choice(
                         len(self.adversary_list), p=self.meta_strategies[1]
@@ -255,27 +309,34 @@ class do_p_dro:
                         len(self.model_list), p=self.meta_strategies[0]
                     )
                     adversary.train(data, self.model_list[model_idx])
-                    # batch_idx = np.random.choice(len(self.train_data_loader))
-                    # attacker_idx = np.random.choice(
-                    #     len(self.attacker_list), p=self.meta_strategies[1]
-                    # )
-                    # (imgs, labels) = self.attacker_list[
-                    #     attacker_idx
-                    # ].perturbed_train_dataloader[batch_idx]
-                    # # for i, (imgs, labels) in enumerate(attacker.perturbed_train_dataloader):
-                    # end_epoch = True if i == len(self.train_data_loader) else False
-                    # classifier.train(imgs, labels, end_epoch)
-            # accuracy = 0.0
-            # for i, (imgs, labels) in enumerate(attacker.perturbed_train_dataloader):
-            #     accuracy += classifier.eval(imgs, labels)
-            # accuracy /= len(self.train_data_loader)
-            # self.generator_list.append(generator)
-            # self.discriminator_list.append(discriminator)
 
-            # self.classifier_list.append(classifier)
-            # self.attacker_list.append(attacker)
+            model_file = os.path.join("results", str(loop) + '_model.pt')
+            lm_file = os.path.join("results", str(loop) + '_lm.pt')
+
             self.model_list.append(model)
+            torch.save(model.model.state_dict(), model_file)
             self.adversary_list.append(adversary)
+            torch.save(adversary.adversary.state_dict(), lm_file)
+
+            save_file = str(loop) + '_model.pt'
+            best_model_state_dict = torch.load(os.path.join("results", save_file))
+            model.model.load_state_dict(best_model_state_dict)
+            # Evaluate on general domain
+            (test_examples_scores, test_losses) = self.task.eval_model(model.model, data='test', by_example=True,
+                                                                       nll=True)
+            test_examples_scores = test_examples_scores.numpy()
+            test_losses = test_losses.numpy()
+            average_ss.append(test_examples_scores.mean())
+
+            group_scores = np.asarray([test_examples_scores[g_idxs].mean() for g_idxs in group_idxs.values()])
+            lower_is_better = False
+            if lower_is_better:
+                current_robust_score = group_scores.max()
+            else:
+                current_robust_score = group_scores.min()
+
+            robust_ss.append(current_robust_score)
+
             r = len(self.model_list)
             c = len(self.adversary_list)
             meta_games = [
@@ -300,29 +361,32 @@ class do_p_dro:
                             # adversary.eval(data, model)
                             sum_loss += loss
                         sum_loss /= len(self.loader)
-                        # generator = self.generator_list[t_r]
-                        # discriminator = self.discriminator_list[t_c]
-                        # gen_loss = 0.0
-                        # dis_loss = 0.0
-                        # sum_idx = 0
-                        # for _ in range(self.eval_max_epoch):
-                        #     for i, (imgs, _) in enumerate(self.data):
-                        #         sum_idx += 1
-                        #         data = {"real_imgs": imgs}
-                        #         g_loss = generator.eval(data, discriminator)
-                        #         gen_loss += g_loss["g_loss"]
-                        #
-                        #         d_loss = discriminator.eval(data, generator)
-                        #         dis_loss += d_loss["d_loss"]
-                        # gen_loss /= sum_idx
-                        # dis_loss /= sum_idx
+                        print(sum_loss)
+
                         meta_games[0][t_r][t_c] = -sum_loss
                         meta_games[1][t_r][t_c] = sum_loss
 
             self.meta_games = meta_games
-            self.meta_strategies = projected_replicator_dynamics(self.meta_games)
+
+            # solution = "nash"
+            solution = "uniform"
+
+            print(solution)
+
+            if solution == "nash":
+                self.meta_strategies = projected_replicator_dynamics(self.meta_games)
+            else:
+                self.meta_strategies = [np.array([1.0 for _ in range(len(self.model_list))]) / len(self.model_list),
+                                        np.array([1.0 for _ in range(len(self.adversary_list))]) / len(
+                                            self.adversary_list)]
             print(self.meta_games)
             print(self.meta_strategies)
+
+            average_score_d = np.average(a=average_ss, weights=self.meta_strategies[0])
+            average_robust_score = np.average(a=robust_ss, weights=self.meta_strategies[0])
+
+            print('Average', average_score_d)
+            print('Robust', average_robust_score)
 
 
 if __name__ == "__main__":
