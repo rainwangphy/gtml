@@ -14,7 +14,7 @@ dataset_list = ["cifar10", "cifar100"]
 # f.write("mkdir -p {}\n\n".format(pare_folder))
 
 result_dir = "./results"
-figure_dir = '../plot_figures'
+figure_dir = '../../plot_figures'
 
 
 #                 "seed_{}_dataset_{}_solution_{}_nb_iter_{}.pth".format(
@@ -27,6 +27,7 @@ figure_dir = '../plot_figures'
 # device_number = 0
 import os.path as osp
 import os
+import seaborn as sns
 
 figure_dir += '/adv'
 if not osp.exists(figure_dir):
@@ -44,7 +45,11 @@ for nb_iter in nb_iter_list:
                     nb_iter,
                 ),))
 
-            # print(res)
+            # sim_matrix = res[5]['meta_game'][0]
+            # heat_map_lin = sns.heatmap(sim_matrix, vmin=0, vmax=1, center=0,
+            #                            annot=True, cmap="magma", linewidths=.25)
+            # heat_map_lin.invert_yaxis()
+            # plt.show()
             acc_list = []
             for i in range(5):
                 idx = i+1

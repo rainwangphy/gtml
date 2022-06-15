@@ -3,8 +3,9 @@ import os.path as osp
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 result_dir = "./results"
-figure_dir = '../plot_figures'
+figure_dir = '../../plot_figures'
 
 figure_dir += '/rarl'
 if not osp.exists(figure_dir):
@@ -28,7 +29,15 @@ for env in env_list:
                     ),
                 ),
             )
-            # print(results)
+            # sim_matrix = results[4]['meta_games'][0]
+            # heat_map = sns.heatmap(sim_matrix,
+            #                        annot=True, cmap="magma", linewidths=.25)
+            # heat_map.invert_yaxis()
+            # plt.show()
+            # heat_map_lin = sns.heatmap(sim_matrix_linear, vmin=0, vmax=1, center=0,
+            #                            annot=True, cmap="magma", linewidths=.25)
+            # heat_map_lin.invert_yaxis()
+            # plt.show()
             utility_list = []
             for i in range(5):
                 if i == 0:

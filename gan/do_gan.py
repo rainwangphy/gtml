@@ -66,14 +66,14 @@ class do_gan:
 
     def get_generator(self):
         args = self.args
-        if args.gan_name == "wgan" or args.gan_name == 'wgan_gp':
+        if args.gan_name == "wgan" or args.gan_name == "wgan_gp":
             return wgan.wgan_generator(args)
         else:
             return v_gan.gan_generator(args)
 
     def get_discriminator(self):
         args = self.args
-        if args.gan_name == "wgan" or args.gan_name == 'wgan_gp':
+        if args.gan_name == "wgan" or args.gan_name == "wgan_gp":
             return wgan.wgan_discriminator(args)
         else:
             return v_gan.gan_discriminator(args)
@@ -314,7 +314,9 @@ class do_gan:
             #     int(self.args.n_critic * self.args.train_max_epoch * (loop + 1)),
             #     desc=f"train the discriminator {loop}",
             # )
-            for epoch in range(int(self.args.n_critic * self.args.train_max_epoch * (loop + 1))):
+            for epoch in range(
+                int(self.args.n_critic * self.args.train_max_epoch * (loop + 1))
+            ):
                 for i, (imgs, _) in enumerate(dataloader):
                     gen_idx = np.random.choice(
                         range(len(self.generator_list)), p=self.meta_strategies[0]
@@ -397,13 +399,20 @@ class do_gan:
         )
         print(dict_score)
         loop = len(self.generator_list)
-        self.result_dict[loop] = {"score": dict_score}
+        self.result_dict[loop] = {
+            "score": dict_score,
+            "meta_game": self.meta_games,
+            "meta_strategies": self.meta_strategies,
+        }
         torch.save(
             self.result_dict,
             osp.join(
                 self.result_dir,
                 "seed_{}_gan_name_{}_dataset_{}_solution_{}".format(
-                    self.args.seed, self.args.gan_name, self.args.dataset, self.args.solution
+                    self.args.seed,
+                    self.args.gan_name,
+                    self.args.dataset,
+                    self.args.solution,
                 ),
             ),
         )
@@ -417,7 +426,11 @@ class do_gan:
             osp.join(
                 self.result_dir,
                 "seed_{}_gan_name_{}_dataset_{}_solution_{}_model_{}".format(
-                    self.args.seed, self.args.gan_name, self.args.dataset, self.args.solution, loop
+                    self.args.seed,
+                    self.args.gan_name,
+                    self.args.dataset,
+                    self.args.solution,
+                    loop,
                 ),
             ),
         )
@@ -491,7 +504,7 @@ if __name__ == "__main__":
     opt = parser.parse_args()
     args = parser.parse_args()
 
-    if args.gan_name == 'wgan_gp':
+    if args.gan_name == "wgan_gp":
         args.lambda_gp = 10.0
     setup_seed(args.seed)
     # print()
